@@ -74,10 +74,27 @@ STUDY-PLAN.md    the 15-day sequence
 vendor/          vendored dbt docs (gitignored, see setup)
 ```
 
+## First run
+
+After the setup below, start with:
+
+```
+/onboarding
+```
+
+It asks how much dbt you have actually shipped, how much time you have and whether the exam is
+booked, then runs a diagnostic — one question per sub-skill, before any studying. Out of that come
+two files: `plan.yml`, which `status.py` reads, and your own `STUDY-PLAN.md`, which replaces the
+example in this repo.
+
+The plan is ordered by what the diagnostic found, not by the topic order in the guide: worst
+adjusted accuracy first, with any confidently-wrong answer promoted to the first phase.
+
 ## How to use it
 
 Ask in plain language, or invoke a skill directly:
 
+- `/onboarding` — build (or rebuild) your study plan.
 - `/study-session` — study a topic: builds the note from the docs, then drills it.
 - `/mock-exam` — practice exam (`quick`, `weak`, `diagnostic`, or a full 65-question run), graded
   and recorded.

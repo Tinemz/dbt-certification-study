@@ -8,8 +8,10 @@ Study repository for the **dbt Analytics Engineering Certification Exam** (dbt C
 ## Start here, every session
 
 1. Run `.venv/bin/python3 status.py` — plan phase, weak sub-skills, attempt history, what is next.
-2. Read `STUDY-PLAN.md` for the sequence and the standing decisions.
-3. Confirm `vendor/dbt-docs/` exists before answering anything technical. If it is missing, stop
+2. **If `plan.yml` does not exist, run the `onboarding` skill before anything else.** There is no
+   plan yet, so no priority is trustworthy: `STUDY-PLAN.md` in a fresh clone is someone else's.
+3. Read `STUDY-PLAN.md` for the sequence and the standing decisions.
+4. Confirm `vendor/dbt-docs/` exists before answering anything technical. If it is missing, stop
    and point the user at "Setting up a new machine" in `README.md` — an ungrounded answer is worse
    than no answer here.
 
@@ -26,7 +28,7 @@ Never state the user's scores from memory. They change every attempt; `status.py
 | Exam format, cut line, question types | `README.md` |
 | What to study and in what order | `exam/learning-path.md` |
 | How well is the user doing? | `progress.yml` (rendered by `status.py` — never read stale copies) |
-| What to do next, and by when | `STUDY-PLAN.md` |
+| What to do next, and by when | `STUDY-PLAN.md` (prose) and `plan.yml` (phases, read by `status.py`) |
 
 Never invent exam scope. If something is not in `exam/topics.yml`, it is not on the exam.
 
@@ -101,8 +103,9 @@ invent exam scope" rule honest at the format level too.
 The confirmed-real shape the guide does show (samples Q08, Q09) is a **code block plus options** —
 that is the `code` field on a `multiple-choice` question, not a separate type.
 
-Bank questions are **original**. The 10 official sample questions live in the local, untracked
-`exam/sample-questions.md` and never enter the bank.
+Bank questions are **original**. The 10 official sample questions stay in the study guide and
+never enter the bank — reproducing them here would both breach the copyright and turn the bank
+into a memorisation aid for questions the real exam does not ask.
 
 ---
 
@@ -125,6 +128,7 @@ inside notes — `progress.yml` is where progress lives.
 
 ## Skills
 
+- **`onboarding`** — first run: questionnaire, time budget, diagnostic, then write the plan.
 - **`study-session`** — study a topic: build the note from the docs, then drill it.
 - **`mock-exam`** — administer, grade, and record a practice exam.
 - **`dbt-docs-lookup`** — answer a one-off dbt question, grounded in the vendored docs.

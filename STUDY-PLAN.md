@@ -1,5 +1,10 @@
 # Study Plan — 15 days to the exam
 
+> **This file is an example, kept in the repo to show the shape of a plan.** It came from a real
+> 15-day run with the exam already booked. Running `/onboarding` overwrites it with yours, built
+> from your experience, your available time and your own diagnostic — a different plan, in a
+> different order, over a different number of days.
+
 Target exam date: **2026-09-30**. Plan day 1 is 2026-09-15.
 
 This is the one file in the repo whose purpose *is* progress tracking, so it carries the sequence
@@ -74,8 +79,9 @@ sub-skills already marked `strong`.
 ### Days 13–14 · Second mock and cleanup
 
 - A second full mock, then close whatever is still weak.
-- Re-read the 10 official sample questions in `exam/sample-questions.md` — they are the only
-  calibrated signal available for real exam difficulty.
+- Re-read the 10 sample questions in the official study guide (linked from `README.md`) — they are
+  the only calibrated signal available for real exam difficulty. They are © dbt Labs and are not
+  reproduced in this repo.
 
 ### Day 15 · Buffer
 

@@ -6,3 +6,6 @@ __pycache__/
 # (c) dbt Labs -- personal study copies, never published
 exam/study-guide.pdf
 exam/sample-questions.md
+
+# generated per person by the onboarding skill
+plan.yml
