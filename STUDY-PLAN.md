@@ -1,4 +1,4 @@
-# Study Plan — 15 days to the exam
+# Study Plan — example: 15 days to a booked exam
 
 > **This file is an example, kept in the repo to show the shape of a plan.** It came from a real
 > 15-day run with the exam already booked. Running `/onboarding` overwrites it with yours, built
@@ -93,7 +93,7 @@ Rest, or absorb a slipped day. Do not study new material the day before.
 
 The exam is online proctored through Talview: https://pages.talview.com/dbtlabs/certifications/
 
-Check slot availability early — the plan does not survive a booking that cannot be made by 30/09.
+Check slot availability early — a plan does not survive a booking that cannot be made in time.
 Rescheduling is free up to 24 hours before; no-shows are not refunded.
 
 ---

@@ -68,9 +68,10 @@ notes/           topic summaries grounded in the docs, one file per topic slug
 exams/bank/      practice question bank -- original questions, six exam formats
 exams/attempts/  graded attempt history
 progress.yml     per-sub-skill performance -- the only performance record
+plan.yml         your plan's phases, written by /onboarding (generated, gitignored)
 status.py        derives the current state; the entry point for a session
 validate_bank.py validates the question bank; run after editing it
-STUDY-PLAN.md    the 15-day sequence
+STUDY-PLAN.md    your plan in prose -- the one in this repo is an example
 vendor/          vendored dbt docs (gitignored, see setup)
 ```
 
@@ -149,7 +150,7 @@ Prints the current plan phase, weak sub-skills ranked by what matters now, attem
 scores adjusted for lucky guesses, and what to study next. Everything is derived from
 `progress.yml` and `exams/attempts/` — nothing stored that can go stale.
 
-Then read [`STUDY-PLAN.md`](STUDY-PLAN.md) for the full 15-day sequence.
+Then read [`STUDY-PLAN.md`](STUDY-PLAN.md) for the full sequence.
 
 ## Notes
 

@@ -14,11 +14,12 @@ Administer a practice exam, grade it, and persist the result.
 | `full` | 65 questions | 2 h | All topics — mirrors the real exam |
 | `quick` | 10–15 questions | untimed | One topic or a set of weak sub-skills |
 | `weak` | 10–20 questions | untimed | Only sub-skills with `confidence: weak` or low accuracy |
-| `diagnostic` | 1 per sub-skill (~32) | untimed | Breadth-first gap finding, run before studying |
+| `diagnostic` | 1 per sub-skill (31) | untimed | Breadth-first gap finding, run before studying |
 
 Default to `quick` and ask which mode if unclear.
 
-`diagnostic` is the pre-study baseline: exactly one question per sub-skill in `exam/topics.yml`,
+`diagnostic` is the pre-study baseline: exactly one question per sub-skill in `exam/topics.yml`
+(31 of them today),
 so every area gets probed once. Expect a low score — its job is to locate gaps, not to measure
 readiness. Save `full` for readiness checks later, once studying is underway.
 

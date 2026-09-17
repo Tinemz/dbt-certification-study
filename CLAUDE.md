@@ -1,4 +1,4 @@
-# dbt-certification — Claude instructions
+# dbt-certification-study — Claude instructions
 
 Study repository for the **dbt Analytics Engineering Certification Exam** (dbt Core 1.11).
 `README.md` describes the project and its layout; this file holds the operating rules.
@@ -96,9 +96,9 @@ invent exam scope" rule honest at the format level too.
   YES/NO, terminates on endorsing a distractor). Not marked inferred.
 - `fill-in-blank`, `matching`, `build-list` — named in the guide; mechanics unambiguous.
 - **`hotspot`** — named in the guide, mechanics **not determinable**. Implemented as identifying a
-  line in a code block, and marked `inferred`. The user's own experience of dbt learning-path
-  questions was that code-block questions were answered by **choosing an option**, which may mean
-  this shape never appears on the real exam. The content is valid practice either way.
+  line in a code block, and marked `inferred`. In the dbt learning-path courses, code-block
+  questions are answered by **choosing an option**, which may mean this shape never appears on the
+  real exam. The content is valid practice either way.
 
 The confirmed-real shape the guide does show (samples Q08, Q09) is a **code block plus options** —
 that is the `code` field on a `multiple-choice` question, not a separate type.
