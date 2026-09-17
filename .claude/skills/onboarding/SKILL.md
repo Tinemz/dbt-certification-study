@@ -12,26 +12,41 @@ and confirm the user wants to rebuild before overwriting it.
 
 ## 1. Level
 
-One `AskUserQuestion` call carrying three questions:
+**Call A — background.** One `AskUserQuestion` call, two questions:
 
 1. **Hands-on dbt experience** — `never used it` · `under 6 months` · `6 months to 2 years` ·
    `2+ years`.
-2. **What you have actually shipped** (multi-select) — incremental models and snapshots ·
-   contracts, versions and constraints · tests, including unit tests · state, deferral and Slim CI ·
-   exposures and source freshness · Python models, packages and macros.
-3. **dbt Core or dbt Cloud day to day** — `Core (CLI)` · `Cloud` · `both`.
+2. **dbt Core or dbt Cloud day to day** — `Core (CLI)` · `Cloud` · `both`.
 
-Why question 3 matters: the exam targets **dbt Core 1.11**. Someone who only works in Cloud
+Why question 2 matters: the exam targets **dbt Core 1.11**. Someone who only works in Cloud
 usually has gaps in CLI flags, `--state` plumbing and `dbt retry`, even with years of experience.
 Weight those topics up.
 
-The official guide recommends SQL proficiency plus 6+ months of hands-on dbt. If the answer to
-question 1 is `never used it`, say plainly that the certification assumes production experience
-and that a plan can only partly substitute for it. Then continue — it is their call, not yours.
+**Call B — what you have actually shipped.** One question per learning-path checkpoint, all
+multi-select, in a single `AskUserQuestion` call:
+
+| Question | Options |
+|---|---|
+| Checkpoint 1 — building models | incremental models (strategies, microbatch) · snapshots and seeds · Jinja, macros and packages · Python models |
+| Checkpoint 2 — governance and debugging | model contracts · model versions and deprecation · constraints in YAML · debugging from logs and compiled code |
+| Checkpoint 3 — pipelines at scale | tests, including unit tests · exposures and source freshness · state, deferral and Slim CI · `dbt clone` and `dbt retry` |
+
+**Do not merge these into one question.** `AskUserQuestion` takes at most four options per
+question, so a single "what have you shipped" list silently drops everything past the fourth
+option. One question per checkpoint keeps every area visible, and the answers land already grouped
+the way `exam/learning-path.md` and the phases below use them.
+
+Nothing shipped in a checkpoint is a valid answer: the tool always offers `Other`, so say in the
+message that `Other → none` is the way to answer that. Never pad a question to four options with
+something the checkpoint does not cover.
+
+The official guide recommends SQL proficiency plus 6+ months of hands-on dbt. If the experience
+answer is `never used it`, say plainly that the certification assumes production experience and
+that a plan can only partly substitute for it. Then continue — it is their call, not yours.
 
 ## 2. Time budget
 
-A second `AskUserQuestion` call:
+A third `AskUserQuestion` call:
 
 1. **Exam date** — `already booked` · `booking within a month` · `no date yet`.
    If booked, ask for the date in the next message and accept `YYYY-MM-DD` or plain text.
@@ -76,7 +91,8 @@ Produce `plan.yml` first, then `STUDY-PLAN.md` from it.
    topic 01 is 14 of 31 and can never be left to the last day.
 4. **Let declared experience adjust, not override.** An area never shipped in production moves up;
    an area shipped for years *and* clean in the diagnostic moves down. The diagnostic wins on
-   conflicts — it is evidence, the questionnaire is self-report.
+   conflicts — it is evidence, the questionnaire is self-report. A checkpoint answered as empty is
+   the strongest signal the questionnaire produces: nothing there has ever been used in anger.
 5. **Reserve the last 15–20% of the time** for a full 65-question mock plus review. No new material
    on the final day.
 6. **Group interlocking sub-skills into one phase.** `--state`, deferral, Slim CI, `dbt clone` and
@@ -95,7 +111,10 @@ hours_per_week: 8
 experience:
   level: 6mo-2y             # none | under-6mo | 6mo-2y | 2y-plus
   platform: core            # core | cloud | both
-  shipped: [incremental, tests]
+  shipped:                  # by learning-path checkpoint, as answered in step 1
+    checkpoint_1: [incremental, snapshots]
+    checkpoint_2: [contracts]
+    checkpoint_3: []
 phases:
   - days: [1, 3]            # day numbers from start_date; weeks when there is no exam date
     title: Topics 07 and 02
