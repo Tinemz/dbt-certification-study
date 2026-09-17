@@ -1,0 +1,237 @@
+# Practice questions for Topic 03 -- Debugging data modeling errors.
+# Original questions written from exam/topics.yml + the vendored official docs.
+
+- id: err-001
+  topic: "03"
+  subskill: 03-01
+  type: multiple-choice
+  stem: >-
+    A dbt run fails with "Compilation Error ... depends on a node named 'stg_ordrs' which was not
+    found". What class of problem is this, and where should you look first?
+  options:
+    a: "A database permission error -- check the warehouse grants on the staging schema"
+    b: "A reference error -- a ref() points at a model name that does not exist in the project"
+    c: "A runtime error -- the upstream model built but returned zero rows"
+    d: "A YAML parsing error -- the schema.yml file has invalid indentation"
+  answer: [b]
+  explanation: >-
+    Compilation errors occur before dbt reaches the warehouse. This message means a ref() names a
+    model dbt cannot find in the project graph -- typically a typo or a deleted model. Runtime
+    errors, by contrast, surface only once dbt executes SQL against the database.
+  docs_ref: website/docs/guides/debug-errors.md
+
+- id: err-002
+  topic: "03"
+  subskill: 03-02
+  type: multiple-choice
+  stem: >-
+    A model using a complex macro produces unexpected results, but the SQL in the .sql file looks
+    correct. What is the most direct way to see what dbt actually sent to the warehouse?
+  options:
+    a: "Run dbt compile and inspect the rendered SQL in the target/ directory"
+    b: "Run dbt run --debug and read the raw Jinja from the logs"
+    c: "Run dbt docs generate and inspect the model's lineage graph"
+    d: "Run dbt parse and inspect the manifest.json node definition"
+  answer: [a]
+  explanation: >-
+    dbt compile renders the Jinja into executable SQL and writes it to the target directory without
+    running it against the warehouse. Reading that compiled output is the standard way to debug
+    macro and Jinja logic, because it shows exactly what would be executed.
+  docs_ref: website/docs/reference/commands/compile.md
+
+- id: err-003
+  topic: "03"
+  subskill: 03-03
+  type: multiple-choice
+  stem: >-
+    After adding a test to schema.yml, every dbt command fails immediately with a parsing error,
+    before any model runs. What does this indicate?
+  options:
+    a: "The test failed and dbt halted the run to prevent building downstream models"
+    b: "The YAML itself is malformed or uses an invalid property, so dbt cannot parse the project"
+    c: "The tested column does not exist in the warehouse table"
+    d: "The test requires a package that has not been installed with dbt deps"
+  answer: [b]
+  explanation: >-
+    Parsing happens before execution, so a YAML error blocks every command -- including commands
+    that would not run that test. A failing test, a missing column, or a missing package all
+    surface later, during compilation or execution, not as a parse-time failure.
+  docs_ref: website/docs/guides/debug-errors.md
+
+- id: err-004
+  topic: "03"
+  subskill: 03-04
+  type: multiple-choice
+  stem: >-
+    A developer fixes a bug in an intermediate model that has twelve downstream dependents. What is
+    the most efficient way to validate the fix before opening a pull request?
+  options:
+    a: "dbt build --select int_my_model, which also tests the downstream models"
+    b: "dbt build --select int_my_model+, building and testing the model and its descendants"
+    c: "dbt test --select int_my_model, since only tests matter before merging"
+    d: "dbt run --select +int_my_model, rebuilding the model's upstream dependencies"
+  answer: [b]
+  explanation: >-
+    The fix could break anything downstream, so the validation scope is the model plus its
+    descendants -- int_my_model+. Using build rather than run means the data tests for those nodes
+    run too. Selecting the model alone would miss the downstream impact, and +int_my_model selects
+    ancestors, which the change did not affect.
+  docs_ref: website/docs/reference/node-selection/graph-operators.md
+
+- id: flg-001
+  topic: "03"
+  subskill: 03-05
+  type: multiple-choice
+  stem: >-
+    Which statement about dbt global configs (flags) is correct?
+  options:
+    a: "Flags can only be set as CLI arguments and cannot be persisted in the project"
+    b: "Flags set in the flags block of dbt_project.yml can be overridden per invocation by the equivalent CLI argument"
+    c: "Behavior-change flags are permanent and cannot be disabled once a project opts in"
+    d: "Environment variables always lose to values set in dbt_project.yml"
+  answer: [b]
+  explanation: >-
+    Global configs can be set in the flags block of dbt_project.yml, via environment variables, or
+    as CLI arguments, and the more specific scope wins -- a CLI argument overrides the project-level
+    setting for that invocation. Behavior-change flags exist precisely to let projects opt into new
+    behaviour gradually, so they can be toggled.
+  docs_ref: website/docs/reference/global-configs/about-global-configs.md
+
+- id: err-005
+  topic: "03"
+  subskill: 03-01
+  type: multiple-choice
+  code: |
+    1 of 4 START test not_null_stg_orders_order_id ......... [RUN]
+    1 of 4 FAIL 23 not_null_stg_orders_order_id ........... [FAIL 23]
+    2 of 4 START sql table model marts.fct_orders ......... [RUN]
+    2 of 4 SKIP relation marts.fct_orders ................. [SKIP]
+  code_lang: text
+  stem: >-
+    Reading this dbt build log, what does the number 23 on the FAIL line represent?
+  options:
+    a: "The exit code dbt will return when the run completes"
+    b: "The number of rows that violated the not_null assertion"
+    c: "The number of seconds the test took to execute"
+    d: "The position of the test in the DAG execution order"
+  answer: [b]
+  explanation: >-
+    In a dbt build log the number after FAIL is the count of failing rows returned by the test
+    query -- here, 23 rows with a null order_id. The 'n of m' prefix is the position in the run, and
+    timing is reported separately.
+  docs_ref: website/docs/reference/commands/build.md
+
+- id: err-006
+  topic: "03"
+  subskill: 03-03
+  type: hotspot
+  format_source: inferred
+  code: |
+    models:
+      - name: fct_orders
+        columns:
+          - name: order_id
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+              tests:
+                - relationships:
+                    to: ref('dim_customers')
+                    field: customer_id
+  code_lang: yaml
+  stem: >-
+    This schema.yml causes every dbt command to fail at parse time. Click the line that introduces
+    the error.
+  answer_line: 9
+  explanation: >-
+    Line 9 over-indents tests: under customer_id. The tests key must sit at the same indentation as
+    name:, exactly as it does for order_id on line 5. Because parsing happens before execution, a
+    YAML indentation error blocks every command, including ones that would not run these tests.
+  docs_ref: website/docs/guides/debug-errors.md
+
+- id: flg-002
+  topic: "03"
+  subskill: 03-05
+  type: fill-in-blank
+  stem: >-
+    Global configs can be set project-wide under a single top-level key in dbt_project.yml. Type
+    that key exactly as it appears in the YAML.
+  answer: ["flags"]
+  answer_note: case-insensitive; trailing colon optional
+  explanation: >-
+    The flags block in dbt_project.yml holds project-level global configs. The same settings can
+    also come from environment variables or CLI arguments, with the more specific scope winning for
+    that invocation.
+  docs_ref: website/docs/reference/global-configs/about-global-configs.md
+
+- id: err-007
+  topic: "03"
+  subskill: 03-02
+  type: multiple-choice
+  code: |
+    select
+        order_id,
+        {{ dbt_utils.star(from=ref('stg_orders'), except=['_loaded_at']) }}
+    from {{ ref('stg_orders') }}
+    where order_date >= '{{ var("start_date") }}'
+  code_lang: sql
+  stem: >-
+    This model returns the wrong date range and you suspect the var is not resolving. What do you
+    inspect, and where?
+  options:
+    a: "The manifest.json node definition, after running dbt parse"
+    b: "The compiled SQL in target/, after running dbt compile"
+    c: "The debug log, after running dbt run --debug"
+    d: "The dbt_project.yml vars block, since compiled output does not show variable values"
+  answer: [b]
+  explanation: >-
+    dbt compile renders all Jinja -- the macro call, the refs, and the var -- into the exact SQL dbt
+    would execute, and writes it to target/. Reading that file shows immediately what start_date
+    resolved to. The manifest holds node metadata rather than final rendered SQL.
+  docs_ref: website/docs/reference/commands/compile.md
+
+- id: err-008
+  topic: "03"
+  subskill: 03-04
+  type: domc
+  stem: >-
+    You have fixed a bug in a staging model that eleven models depend on. For each validation step,
+    decide whether it belongs before opening the pull request.
+  domc_options:
+    - text: "Build the model and its descendants with dbt build --select stg_model+"
+      keyed: true
+    - text: "Confirm the data tests on the downstream models pass, not just the model itself"
+      keyed: true
+    - text: "Inspect the compiled SQL to confirm the fix rendered as intended"
+      keyed: true
+    - text: "Run the change directly against the production schema to confirm real data behaves"
+      keyed: false
+    - text: "Rebuild the model's ancestors, since the fix may have invalidated them"
+      keyed: false
+  explanation: >-
+    The validation scope is the changed model plus everything downstream of it, built and tested in
+    a development environment. Ancestors are unaffected by a change in their child, and validating
+    against production before review is exactly what a development target and Slim CI exist to
+    avoid.
+  docs_ref: website/docs/reference/node-selection/graph-operators.md
+
+- id: flg-003
+  topic: "03"
+  subskill: 03-05
+  type: multiple-choice
+  stem: >-
+    A project sets a flag in the flags block of dbt_project.yml. The same setting is also passed as
+    a CLI argument on one invocation, and exists as an environment variable. Which wins for that
+    invocation?
+  options:
+    a: "dbt_project.yml, because project configuration is the most authoritative"
+    b: "The CLI argument, because the most specific scope wins for that invocation"
+    c: "The environment variable, because it is evaluated last at runtime"
+    d: "dbt raises an error rather than resolving the conflict"
+  answer: [b]
+  explanation: >-
+    Global configs can be set in the flags block, via environment variables, or as CLI arguments,
+    and the narrower scope takes precedence -- so a CLI argument overrides both for that run. This
+    is what lets a project hold a default while a single invocation deviates.
+  docs_ref: website/docs/reference/global-configs/about-global-configs.md

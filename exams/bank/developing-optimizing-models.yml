@@ -1,0 +1,639 @@
+# Practice questions for Topic 01 -- Developing and optimizing dbt models.
+# Original questions written from exam/topics.yml + the vendored official docs.
+# Every docs_ref path is relative to vendor/dbt-docs/ and must resolve to a real file.
+
+- id: mat-001
+  topic: "01"
+  subskill: 01-02
+  type: multiple-choice
+  stem: >-
+    A model contains a small reusable transformation that several downstream models need, but the
+    team does not want it to occupy any object in the data warehouse. Which materialization fits,
+    and what is the consequence?
+  options:
+    a: "view -- it occupies no storage because it is computed on read"
+    b: "ephemeral -- it is inlined as a CTE into each downstream model and cannot be selected or tested directly"
+    c: "table -- with a post-hook that drops the relation after the run"
+    d: "incremental -- with an is_incremental() guard that never evaluates to true"
+  answer: [b]
+  explanation: >-
+    Ephemeral models are not built in the warehouse at all; dbt interpolates their SQL as a CTE in
+    every model that refs them. The trade-off is that they have no queryable relation, so they
+    cannot be selected directly or have data tests run against them. A view is still a database
+    object, which the requirement rules out.
+  docs_ref: website/docs/docs/build/materializations.md
+
+- id: sel-001
+  topic: "01"
+  subskill: 01-04
+  type: multiple-choice
+  stem: >-
+    Which command builds my_model together with its direct children only, without touching its
+    parents?
+  options:
+    a: "dbt run --select my_model+1"
+    b: "dbt run --select 1+my_model"
+    c: "dbt run --select +1my_model"
+    d: "dbt run --select @my_model"
+  answer: [a]
+  explanation: >-
+    The integer goes on the side the arrow points from. my_model+1 selects the model plus
+    first-degree descendants. 1+my_model would select first-degree parents instead, +1my_model is
+    not valid syntax, and @my_model pulls in descendants plus all of their ancestors.
+  docs_ref: website/docs/reference/node-selection/graph-operators.md
+
+- id: src-001
+  topic: "01"
+  subskill: 01-01
+  type: multiple-choice
+  stem: >-
+    A model references analytics.raw.orders, analytics.raw.customers, analytics.raw.payments and
+    analytics.finance.invoices. How many sources and how many tables are defined in sources.yml?
+  options:
+    a: "1 source with 4 tables"
+    b: "2 sources with 4 tables"
+    c: "4 sources with 4 tables"
+    d: "2 sources with 2 tables"
+  answer: [b]
+  explanation: >-
+    A source maps to one database + schema pair. analytics.raw and analytics.finance are two
+    distinct pairs, so two sources. Tables are listed under each source's tables key -- three under
+    raw and one under finance, for four tables total.
+  docs_ref: website/docs/docs/build/sources.md
+
+- id: inc-001
+  topic: "01"
+  subskill: 01-11
+  type: multiple-choice
+  stem: >-
+    A nightly job rebuilds a 400 million row table. Roughly 70% of its rows receive updated
+    attribute values on every run. Which approach is most appropriate?
+  options:
+    a: "incremental with the append strategy, since the table is large"
+    b: "incremental with the merge strategy on a unique_key"
+    c: "table -- a full rebuild, because incremental logic gives little benefit when most rows change"
+    d: "incremental with the microbatch strategy and a daily batch_size"
+  answer: [c]
+  explanation: >-
+    Incremental materialization pays off when the volume of changed rows per run is small relative
+    to the table. When around 70% of the dataset changes, the merge overhead approaches or exceeds
+    a straight rebuild while adding complexity. append would silently duplicate updated records,
+    and microbatch requires a reliable event_time and suits append-heavy time-series data.
+  docs_ref: website/docs/docs/build/incremental-models.md
+
+- id: mb-001
+  topic: "01"
+  subskill: 01-14
+  type: multiple-choice
+  stem: >-
+    A microbatch model joins a large page_views model to a small customers dimension. event_time is
+    configured on the microbatch model and on page_views, but not on customers. What happens?
+  options:
+    a: "dbt raises a compilation error because every parent of a microbatch model requires event_time"
+    b: "page_views is filtered to each batch window while customers is scanned in full for every batch"
+    c: "Both parents are filtered using the microbatch model's own event_time column"
+    d: "customers is filtered using its primary key instead of a time column"
+  answer: [b]
+  explanation: >-
+    Microbatch filters only the refs that declare event_time. A parent without it is not filtered,
+    producing a full scan on every batch -- which is acceptable for a small dimension but costly
+    for a large table. The docs explicitly recommend setting event_time on any upstream model you
+    want filtered, even when its time column has a different name.
+  docs_ref: website/docs/docs/build/incremental-microbatch.md
+
+- id: emp-001
+  topic: "01"
+  subskill: 01-12
+  type: multiple-choice
+  stem: >-
+    An engineer runs dbt build --empty in CI. A not_null test on a column that definitely contains
+    nulls in the source passes. Which statement explains this correctly?
+  options:
+    a: "--empty skips data tests and reports them as passing"
+    b: "--empty limits refs and sources to zero rows, so the test finds no violating rows and passes"
+    c: "--empty converts data tests into schema-only validations of column data types"
+    d: "--empty caches the previous successful test result instead of re-running it"
+  answer: [b]
+  explanation: >-
+    The --empty flag limits refs and sources to zero rows; dbt still executes the SQL and still
+    runs the tests, but against empty relations. Any test that looks for violating rows therefore
+    passes vacuously. --empty does not skip tests and does not change how a test works.
+  docs_ref: website/docs/docs/build/empty-flag.md
+
+- id: smp-001
+  topic: "01"
+  subskill: 01-13
+  type: multiple-choice
+  stem: >-
+    A developer runs dbt run --select stg_events --sample="3 days" but the model builds with the
+    full dataset instead of a three-day slice. What is the most likely cause?
+  options:
+    a: "The --sample flag only works with the build command, not run"
+    b: "event_time is not configured on the refs or sources that stg_events reads from"
+    c: "Sample mode requires a static time spec; relative specs are not supported"
+    d: "The model is materialized as a view, and sample mode only applies to tables"
+  answer: [b]
+  explanation: >-
+    Sample mode is time-based: it generates filtered refs and sources using the event_time config.
+    Without event_time on the upstream resource, there is no column to filter on. --sample is
+    available on both run and build, and relative specs such as "3 days" are supported alongside
+    static start/end windows.
+  docs_ref: website/docs/docs/build/sample-flag.md
+
+- id: snp-001
+  topic: "01"
+  subskill: 01-10
+  type: multiple-choice
+  stem: >-
+    A source table has no trustworthy updated-at column, but changes to its status and amount
+    columns must be tracked historically. Which snapshot configuration is correct?
+  options:
+    a: "strategy: timestamp with updated_at set to the load timestamp of the ingestion pipeline"
+    b: "strategy: check with check_cols: [status, amount]"
+    c: "strategy: check with updated_at: status"
+    d: "strategy: timestamp with check_cols: all"
+  answer: [b]
+  explanation: >-
+    The check strategy exists precisely for sources without a reliable updated_at column -- it
+    compares the listed columns (or all) between runs to detect changes. The timestamp strategy
+    requires updated_at and check_cols belongs to the check strategy, so the mixed options are
+    invalid configurations.
+  docs_ref: website/docs/docs/build/snapshots.md
+
+- id: grt-001
+  topic: "01"
+  subskill: 01-09
+  type: multiple-choice
+  stem: >-
+    A model sets grants with select: ['reporter']. A DBA manually grants select on the same table
+    to an additional role. What happens on the next dbt run?
+  options:
+    a: "Both grants persist, because dbt only ever adds privileges"
+    b: "dbt revokes the manually added grant, because it enforces that grants match the config exactly"
+    c: "dbt raises an error reporting a grant drift between config and warehouse"
+    d: "Nothing changes, because grants are only applied when the relation is first created"
+  answer: [b]
+  explanation: >-
+    Grants are applied at build time and dbt ensures the object's grants match the configuration
+    exactly, issuing both grant and revoke statements. Privileges added outside dbt are removed.
+    To add to inherited grants rather than replace them, prefix the privilege with + in
+    dbt_project.yml.
+  docs_ref: website/docs/reference/resource-configs/grants.md
+
+- id: dag-001
+  topic: "01"
+  subskill: 01-05
+  type: multiple-choice
+  stem: >-
+    A model reads from dbt_prod.stg_orders in its FROM clause and uses {{ ref('stg_customers') }}
+    in its JOIN clause. It intermittently fails because stg_orders does not yet exist. What is the
+    fix?
+  options:
+    a: "Add stg_orders to the model's depends_on config in dbt_project.yml"
+    b: "Replace the hard-coded dbt_prod.stg_orders with {{ ref('stg_orders') }}"
+    c: "Change stg_orders to an ephemeral materialization so it is always inlined"
+    d: "Reorder the models so stg_orders appears earlier in the models directory"
+  answer: [b]
+  explanation: >-
+    dbt builds the DAG from ref() and source() calls. A hard-coded relation creates no edge, so dbt
+    is free to build the models in any order. Every hard-coded reference -- in FROM and in every
+    JOIN -- must be replaced with ref(). File ordering and directory layout have no effect on
+    execution order.
+  docs_ref: website/docs/reference/dbt-jinja-functions/ref.md
+
+- id: cfg-001
+  topic: "01"
+  subskill: 01-06
+  type: multiple-choice
+  stem: >-
+    dbt_project.yml sets +materialized: view for the whole project and +materialized: table for the
+    marts folder. The file marts/fct_orders.sql contains {{ config(materialized='incremental') }}.
+    How is fct_orders built?
+  options:
+    a: "As a view, because dbt_project.yml always takes precedence"
+    b: "As a table, because folder-level configuration overrides in-file configuration"
+    c: "As incremental, because an in-file config block is the most specific level"
+    d: "dbt raises a conflicting configuration error at parse time"
+  answer: [c]
+  explanation: >-
+    Configuration precedence runs from weakest to strongest as dbt_project.yml, then the property
+    YAML config block, then the in-file config() block. The most specific declaration wins, so the
+    in-file incremental setting applies. Conflicting configs across levels are resolved by
+    precedence, not treated as errors.
+  docs_ref: website/docs/reference/configs-and-properties.md
+
+- id: py-001
+  topic: "01"
+  subskill: 01-08
+  type: multiple-choice
+  stem: >-
+    Which statement about dbt Python models is true?
+  options:
+    a: "They support view, table, incremental and ephemeral materializations like SQL models"
+    b: "They declare dependencies with {{ ref('model') }} Jinja syntax inside the function body"
+    c: "They must return a DataFrame and support only the table and incremental materializations"
+    d: "The --empty flag applies to them the same way it applies to SQL models"
+  answer: [c]
+  explanation: >-
+    A Python model defines model(dbt, session) and must return a DataFrame. Only table and
+    incremental materializations are supported. Dependencies use the dbt.ref() and dbt.source()
+    Python methods rather than Jinja, and both the --empty and --sample flags are ignored on
+    Python models.
+  docs_ref: website/docs/docs/build/python-models.md
+
+- id: mod-001
+  topic: "01"
+  subskill: 01-03
+  type: multiple-choice
+  stem: >-
+    The same currency-conversion CTE is copy-pasted into four different mart models. Which
+    refactoring best applies DRY principles in dbt?
+  options:
+    a: "Move the CTE into a macro and call it inside each of the four models"
+    b: "Extract it into its own intermediate model that the four marts ref()"
+    c: "Duplicate it into a fifth model and have the others select from that with a hard-coded name"
+    d: "Leave it duplicated -- CTEs are compiled inline anyway, so there is no cost"
+  answer: [b]
+  explanation: >-
+    dbt's modularity approach is to break a shared transformation into its own model and ref() it
+    from every consumer, so the logic is defined once and the DAG records the dependency. A macro
+    would re-execute the SQL in each model rather than reusing a single computed result, and a
+    hard-coded reference would create no dependency edge at all.
+  docs_ref: website/docs/best-practices/how-we-structure/1-guide-overview.md
+
+- id: pkg-001
+  topic: "01"
+  subskill: 01-07
+  type: multiple-choice
+  stem: >-
+    A project adds dbt_utils to packages.yml. Which statement about the installed package is correct?
+  options:
+    a: "Its macros are available immediately; dbt deps only needs to run in production"
+    b: "dbt deps installs it into dbt_packages/, and its models and tests become part of your DAG and build with your project"
+    c: "Packages provide macros only -- any models they contain are ignored"
+    d: "Package versions must be pinned to an exact release; version ranges are not supported"
+  answer: [b]
+  explanation: >-
+    dbt deps resolves packages.yml and installs into dbt_packages/. A package can ship macros,
+    models, seeds, and tests, and everything it contains becomes part of your project's DAG and
+    builds alongside your own resources. Packages can be sourced from the hub, git, or a local
+    path, and version ranges are supported.
+  docs_ref: website/docs/docs/build/packages.md
+
+- id: grt-002
+  topic: "01"
+  subskill: 01-09
+  type: domc
+  stem: >-
+    A model configures grants with select: ['reporter']. For each statement, decide whether it is
+    true of how dbt applies grants.
+  domc_options:
+    - text: "dbt ensures the object's grants match the config exactly, issuing revoke as well as grant"
+      keyed: true
+    - text: "Grants are applied at build time, every time the model is built"
+      keyed: true
+    - text: "Prefixing a privilege with + in dbt_project.yml adds to inherited grants instead of replacing them"
+      keyed: true
+    - text: "dbt only ever adds privileges, so grants applied manually outside dbt persist"
+      keyed: false
+    - text: "Grants are applied only when the relation is first created"
+      keyed: false
+  explanation: >-
+    Grants are enforced to match the configuration exactly on every build, which means privileges
+    granted outside dbt get revoked. The + prefix on a privilege is the documented way to add to
+    inherited grants rather than replace them. For anything beyond this -- row/column-level access,
+    masking policies, future grants -- the docs point to hooks.
+  docs_ref: website/docs/reference/resource-configs/grants.md
+
+- id: smp-002
+  topic: "01"
+  subskill: 01-13
+  type: matching
+  stem: Match each dbt flag or config to what it does during development.
+  pairs:
+    - left: "--empty"
+      right: Limits refs and sources to zero rows; validates schema and dependencies
+    - left: "--sample"
+      right: Builds with a time-based slice of real data, filtered on event_time
+    - left: "event_time"
+      right: The column sample mode and microbatch use to filter by time range
+    - left: "--full-refresh"
+      right: Rebuilds an incremental model from scratch, ignoring existing rows
+  explanation: >-
+    --empty and --sample are a progression: empty validates semantics with zero rows, sample goes
+    further by including real data from a time window. Both depend on different things -- sample
+    requires event_time on the refs you want filtered, and both are ignored on Python models.
+  docs_ref: website/docs/docs/build/sample-flag.md
+
+- id: emp-002
+  topic: "01"
+  subskill: 01-12
+  type: fill-in-blank
+  stem: >-
+    Which flag limits refs and sources to zero rows, so dbt executes the model SQL against the
+    warehouse without expensive reads of input data? Type the flag exactly, including its dashes.
+  answer: ["--empty"]
+  answer_note: case-insensitive; leading dashes optional
+  explanation: >-
+    The --empty flag is supported on run, build, snapshot, and compile. It still executes SQL, which
+    is what validates dependencies and column names -- and is also why tests under --empty pass
+    vacuously against the resulting empty tables.
+  docs_ref: website/docs/docs/build/empty-flag.md
+
+- id: inc-002
+  topic: "01"
+  subskill: 01-11
+  type: matching
+  stem: Match each incremental strategy to the situation it best fits.
+  pairs:
+    - left: append
+      right: Immutable event logs where rows are never updated
+    - left: merge
+      right: Records that can be updated, matched on a unique_key
+    - left: insert_overwrite
+      right: Partitioned warehouses where whole partitions are replaced
+    - left: microbatch
+      right: Large time-series data processed as independent, retryable batches
+  explanation: >-
+    Strategy choice follows the shape of the data and the platform. Support varies by adapter --
+    insert_overwrite is unavailable on Postgres and Redshift, for example -- so the adapter's own
+    configuration page is the authority on what is available.
+  docs_ref: website/docs/docs/build/incremental-strategy.md
+
+- id: snp-002
+  topic: "01"
+  subskill: 01-10
+  type: hotspot
+  format_source: inferred
+  code: |
+    snapshots:
+      - name: orders_snapshot
+        relation: source('jaffle_shop', 'orders')
+        config:
+          schema: snapshots
+          unique_key: id
+          strategy: check
+          updated_at: updated_at
+  code_lang: yaml
+  stem: >-
+    This snapshot fails to configure correctly. Click the line that does not belong with the chosen
+    strategy.
+  answer_line: 8
+  explanation: >-
+    Line 8 sets updated_at, which belongs to the timestamp strategy. The check strategy detects
+    change by comparing columns and requires check_cols instead -- either an explicit list or all.
+    Mixing the two strategies' required properties is an invalid configuration.
+  docs_ref: website/docs/docs/build/snapshots.md
+
+- id: src-002
+  topic: "01"
+  subskill: 01-01
+  type: hotspot
+  format_source: inferred
+  code: |
+    sources:
+      - name: jaffle_shop
+        database: raw
+        schema: public
+        tables:
+          - name: orders
+          - name: customers
+            identifier: raw_customers
+          - name: legacy_orders
+            database: archive
+  code_lang: yaml
+  stem: >-
+    A teammate claims every table in this source resolves to raw.public. Click the line that makes
+    that claim false.
+  answer_line: 10
+  explanation: >-
+    Line 10 overrides database for legacy_orders, so it resolves to archive.public rather than
+    raw.public. identifier on line 8 changes only the table name, not its database or schema, so
+    customers still resolves inside raw.public.
+  docs_ref: website/docs/docs/build/sources.md
+
+- id: mat-002
+  topic: "01"
+  subskill: 01-02
+  type: matching
+  stem: Match each materialization to the consequence that most distinguishes it.
+  pairs:
+    - left: view
+      right: No stored rows; recomputed on every read
+    - left: table
+      right: Fully rebuilt each run; fastest to query
+    - left: incremental
+      right: Built once, then only new or changed rows are processed
+    - left: ephemeral
+      right: No warehouse object at all; inlined as a CTE into each consumer
+  explanation: >-
+    The distinguishing axis is what ends up in the warehouse and when it is computed. Ephemeral is
+    the outlier: because no relation exists, it cannot be selected directly or have data tests run
+    against it.
+  docs_ref: website/docs/docs/build/materializations.md
+
+- id: mod-002
+  topic: "01"
+  subskill: 01-03
+  type: multiple-choice
+  stem: >-
+    According to dbt's guidance, which situation is the strongest signal that a CTE should be
+    extracted into its own model?
+  options:
+    a: "The CTE contains more than twenty lines of SQL"
+    b: "The CTE changes the grain of the data it selects from"
+    c: "The CTE references a source rather than another model"
+    d: "The CTE uses a window function"
+  answer: [b]
+  explanation: >-
+    A CTE that changes the grain -- what one record represents -- is worth isolating precisely so
+    the transformation can be tested independently. Duplication across models and sheer length are
+    also cited as reasons, but a grain change is the one that carries a correctness risk.
+  docs_ref: website/docs/best-practices/best-practice-workflows.md
+
+- id: cmd-001
+  topic: "01"
+  subskill: 01-04
+  type: matching
+  stem: Match each command to what it does.
+  pairs:
+    - left: dbt build
+      right: Runs models, tests, snapshots and seeds interleaved in DAG order
+    - left: dbt compile
+      right: Renders Jinja into SQL without executing it against the warehouse
+    - left: dbt show
+      right: Previews a model's result set without materializing it
+    - left: dbt seed
+      right: Loads CSV files from the seeds directory into the warehouse
+  explanation: >-
+    The pair most often confused is build versus run: build additionally runs tests, snapshots and
+    seeds, interleaved so that a test failure skips its dependents. compile and show both avoid
+    materializing, but only show returns rows.
+  docs_ref: website/docs/reference/commands/build.md
+
+- id: dag-002
+  topic: "01"
+  subskill: 01-05
+  type: build-list
+  stem: >-
+    Put these models in the order dbt will build them, given that each uses ref() for its
+    dependencies.
+  sequence:
+    - "stg_orders, selecting from a source"
+    - "int_orders_joined, selecting from stg_orders"
+    - "fct_orders, selecting from int_orders_joined"
+    - "An exposure depending on fct_orders"
+  explanation: >-
+    dbt topologically sorts the DAG from ref() and source() calls, so a model never builds before
+    its parents. Exposures are not built at all -- they sit at the end of the graph as declared
+    consumers, which is what lets you select everything feeding them.
+  docs_ref: website/docs/reference/dbt-jinja-functions/ref.md
+
+- id: cfg-002
+  topic: "01"
+  subskill: 01-06
+  type: hotspot
+  format_source: inferred
+  code: |
+    models:
+      my_project:
+        +materialized: view
+        staging:
+          +materialized: view
+          +schema: staging
+        marts:
+          materialized: table
+          +schema: marts
+  code_lang: yaml
+  stem: >-
+    Models in marts/ are not being built as tables. Click the line responsible.
+  answer_line: 8
+  explanation: >-
+    Line 8 is missing the + prefix. Without it, dbt reads materialized as a folder name rather than
+    a config key, so the setting is ignored and marts models fall back to the project-level view on
+    line 3. Every other config in this file uses the prefix correctly.
+  docs_ref: website/docs/reference/dbt_project.yml.md
+
+- id: pkg-002
+  topic: "01"
+  subskill: 01-07
+  type: fill-in-blank
+  stem: >-
+    After adding a package to packages.yml, which command installs it before the project can use its
+    macros? Type the command including dbt.
+  answer: ["dbt deps", "deps"]
+  answer_note: case-insensitive
+  explanation: >-
+    dbt deps resolves packages.yml and installs into dbt_packages/. Until it runs, any macro or
+    model the package provides is unresolvable, so the project fails to compile.
+  docs_ref: website/docs/docs/build/packages.md
+
+- id: py-002
+  topic: "01"
+  subskill: 01-08
+  type: hotspot
+  format_source: inferred
+  code: |
+    def model(dbt, session):
+        dbt.config(materialized="table")
+
+        orders = dbt.ref("stg_orders")
+        customers = {{ ref('stg_customers') }}
+
+        joined = orders.join(customers, "customer_id", "left")
+        return joined
+  code_lang: text
+  stem: >-
+    This Python model fails. Click the line with the error.
+  answer_line: 5
+  explanation: >-
+    Line 5 uses Jinja ref syntax, which does not work inside a Python model. Python models declare
+    dependencies with the dbt.ref() and dbt.source() methods, as line 4 does correctly. The rest of
+    the model is valid: config via dbt.config, and a DataFrame returned at the end.
+  docs_ref: website/docs/docs/build/python-models.md
+
+- id: grt-003
+  topic: "01"
+  subskill: 01-09
+  type: multiple-choice
+  code: |
+    models:
+      my_project:
+        +grants:
+          select: ['analyst']
+        marts:
+          +grants:
+            select: ['+bi_tool']
+  code_lang: yaml
+  stem: >-
+    Which privileges end up on a model inside marts/?
+  options:
+    a: "Only bi_tool -- the marts-level config replaces the project-level one"
+    b: "Both analyst and bi_tool -- the + prefix on the privilege adds to inherited grants"
+    c: "Only analyst -- a privilege prefixed with + is ignored as invalid syntax"
+    d: "Neither -- conflicting grants at two levels cause dbt to skip granting entirely"
+  answer: [b]
+  explanation: >-
+    Configs normally override at the more specific level, which would leave only bi_tool. Prefixing
+    the privilege itself with + changes that to an additive merge, so the inherited analyst grant is
+    kept alongside bi_tool.
+  docs_ref: website/docs/reference/resource-configs/grants.md
+
+- id: emp-003
+  topic: "01"
+  subskill: 01-12
+  type: domc
+  stem: >-
+    For each statement about the --empty flag, decide whether it is true.
+  domc_options:
+    - text: "It limits refs and sources to zero rows while still executing the model SQL"
+      keyed: true
+    - text: "It is supported on run, build, snapshot and compile"
+      keyed: true
+    - text: "It is ignored when used on a Python model"
+      keyed: true
+    - text: "It causes dbt to skip data tests entirely"
+      keyed: false
+    - text: "It validates column data types without connecting to the warehouse"
+      keyed: false
+  explanation: >-
+    The flag limits input rows but still runs the SQL against the warehouse -- that execution is
+    what validates dependencies and column names. Tests still run, which is why a unique or not_null
+    test passes vacuously against the resulting empty tables.
+  docs_ref: website/docs/docs/build/empty-flag.md
+
+- id: mb-002
+  topic: "01"
+  subskill: 01-14
+  type: build-list
+  stem: >-
+    Put the steps for converting a large time-series model to the microbatch strategy in order.
+  sequence:
+    - "Identify the column that timestamps each event"
+    - "Set event_time on the model and on every upstream model that should be filtered"
+    - "Set incremental_strategy to microbatch and choose a batch_size"
+    - "Run the model so dbt splits processing into time-bounded batches"
+    - "Retry or backfill individual batches independently as needed"
+  explanation: >-
+    event_time is the prerequisite: microbatch filters only the refs that declare it, so an upstream
+    model without it gets a full scan on every batch. Because each batch is atomic and idempotent,
+    dbt can build, retry and backfill them separately.
+  docs_ref: website/docs/docs/build/incremental-microbatch.md
+
+- id: mb-003
+  topic: "01"
+  subskill: 01-14
+  type: multiple-choice
+  stem: >-
+    How does event_time differ from partition_by in a microbatch model?
+  options:
+    a: "They are synonyms; partition_by is the older name for event_time"
+    b: "event_time defines time ranges used to filter rows into batches; partition_by groups rows into storage partitions"
+    c: "event_time applies to the model, partition_by applies to its upstream sources"
+    d: "partition_by is required whenever event_time is set"
+  answer: [b]
+  explanation: >-
+    The docs call this out explicitly because it is easy to conflate. event_time is the time column
+    microbatch uses to bound each batch; partition_by is a platform storage concern that groups rows
+    into partitions. Setting one does not imply the other.
+  docs_ref: website/docs/docs/build/incremental-microbatch.md

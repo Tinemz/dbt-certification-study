@@ -1,0 +1,199 @@
+# Study progress -- single source of truth for performance tracking.
+# Updated by the mock-exam skill after every attempt; study-session may adjust confidence.
+# confidence: unknown | weak | ok | strong
+#   weak   -> accuracy < 60% over >= 5 answers, or self-assessed as shaky
+#   ok     -> accuracy 60-84% over >= 5 answers
+#   strong -> accuracy >= 85% over >= 5 answers
+# Confidence overrides (set by mock-exam from stated confidence, see that skill):
+#   a confident-but-wrong answer forces 'weak' regardless of accuracy -- a misconception
+#     outranks the ratio, because nothing signals to the candidate that they should check
+#   a correct answer stated as a guess never raises confidence above 'unknown'
+# Regenerate the skeleton from exam/topics.yml if the official outline ever changes.
+
+subskills:
+  01-01:
+    topic: '01'
+    name: Identifying and verifying any raw object dependencies
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-02:
+    topic: '01'
+    name: Understanding core dbt materializations
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-03:
+    topic: '01'
+    name: Conceptualizing modularity and how to incorporate DRY principles
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-04:
+    topic: '01'
+    name: Using commands such as build, run, test, docs, show, snapshot, and seed
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-05:
+    topic: '01'
+    name: Creating a logical flow of models and building clean DAGs
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-06:
+    topic: '01'
+    name: Defining configurations in dbt_project.yml
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-07:
+    topic: '01'
+    name: Using dbt Packages
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-08:
+    topic: '01'
+    name: Creating Python models
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-09:
+    topic: '01'
+    name: Providing access to users to models with the "grants" config
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-10:
+    topic: '01'
+    name: Creating snapshots in YAML
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-11:
+    topic: '01'
+    name: Selecting the optimal incremental strategy based on a dataset's characteristics
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-12:
+    topic: '01'
+    name: Validating model logic and schema definitions in dry-runs using the --empty flag
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-13:
+    topic: '01'
+    name: Running models in sample mode using the --sample flag
+    seen: 0
+    correct: 0
+    confidence: unknown
+  01-14:
+    topic: '01'
+    name: Understanding advanced dbt materializations such as microbatch
+    seen: 0
+    correct: 0
+    confidence: unknown
+  02-01:
+    topic: '02'
+    name: Adding contracts to models to ensure the shape of models
+    seen: 0
+    correct: 0
+    confidence: unknown
+  02-02:
+    topic: '02'
+    name: Creating different versions of our models and deprecating the old ones
+    seen: 0
+    correct: 0
+    confidence: unknown
+  02-03:
+    topic: '02'
+    name: Defining constraints in YAML to enforce data integrity at the platform level
+    seen: 0
+    correct: 0
+    confidence: unknown
+  03-01:
+    topic: '03'
+    name: Understanding logged error messages
+    seen: 0
+    correct: 0
+    confidence: unknown
+  03-02:
+    topic: '03'
+    name: Troubleshooting using compiled code
+    seen: 0
+    correct: 0
+    confidence: unknown
+  03-03:
+    topic: '03'
+    name: Troubleshooting .yml compilation errors
+    seen: 0
+    correct: 0
+    confidence: unknown
+  03-04:
+    topic: '03'
+    name: Developing and implementing a fix and testing it prior to merging
+    seen: 0
+    correct: 0
+    confidence: unknown
+  03-05:
+    topic: '03'
+    name: Managing dbt behavior with flags
+    seen: 0
+    correct: 0
+    confidence: unknown
+  04-01:
+    topic: '04'
+    name: Troubleshooting and managing failure points in the DAG
+    seen: 0
+    correct: 0
+    confidence: unknown
+  04-02:
+    topic: '04'
+    name: Using dbt clone
+    seen: 0
+    correct: 0
+    confidence: unknown
+  05-01:
+    topic: '05'
+    name: Using generic, singular, custom, custom generic, and unit tests on a wide variety of models and sources
+    seen: 0
+    correct: 0
+    confidence: unknown
+  05-02:
+    topic: '05'
+    name: Testing assumptions for dbt models and sources
+    seen: 0
+    correct: 0
+    confidence: unknown
+  05-03:
+    topic: '05'
+    name: Implementing various testing steps in the workflow
+    seen: 0
+    correct: 0
+    confidence: unknown
+  06-01:
+    topic: '06'
+    name: Implementing dbt exposures
+    seen: 0
+    correct: 0
+    confidence: unknown
+  06-02:
+    topic: '06'
+    name: Implementing source freshness
+    seen: 0
+    correct: 0
+    confidence: unknown
+  07-01:
+    topic: '07'
+    name: Understanding state and state selection
+    seen: 0
+    correct: 0
+    confidence: unknown
+  07-02:
+    topic: '07'
+    name: Using dbt retry
+    seen: 0
+    correct: 0
+    confidence: unknown

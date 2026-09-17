@@ -1,0 +1,107 @@
+# Official topics outline for the dbt Analytics Engineering Certification Exam.
+# Source of truth: the official dbt Labs study guide (updated for dbt Core 1.11),
+# https://www.getdbt.com/dbt-assets/certifications/dbt-certificate-study-guide-version-1-11
+# The official guide does NOT publish percentage weights -- every question is worth 1 point.
+# Do not add topics or sub-skills that are not in the official outline.
+
+exam: dbt Analytics Engineering Certification Exam
+dbt_version: "1.11"
+source: https://www.getdbt.com/dbt-assets/certifications/dbt-certificate-study-guide-version-1-11
+
+topics:
+  - id: "01"
+    slug: developing-optimizing-models
+    name: Developing and optimizing dbt models
+    subskills:
+      - id: 01-01
+        name: Identifying and verifying any raw object dependencies
+      - id: 01-02
+        name: Understanding core dbt materializations
+      - id: 01-03
+        name: Conceptualizing modularity and how to incorporate DRY principles
+      - id: 01-04
+        name: Using commands such as build, run, test, docs, show, snapshot, and seed
+      - id: 01-05
+        name: Creating a logical flow of models and building clean DAGs
+      - id: 01-06
+        name: Defining configurations in dbt_project.yml
+      - id: 01-07
+        name: Using dbt Packages
+      - id: 01-08
+        name: Creating Python models
+      - id: 01-09
+        name: Providing access to users to models with the "grants" config
+      - id: 01-10
+        name: Creating snapshots in YAML
+      - id: 01-11
+        name: Selecting the optimal incremental strategy based on a dataset's characteristics
+      - id: 01-12
+        name: Validating model logic and schema definitions in dry-runs using the --empty flag
+      - id: 01-13
+        name: Running models in sample mode using the --sample flag
+      - id: 01-14
+        name: Understanding advanced dbt materializations such as microbatch
+
+  - id: "02"
+    slug: models-governance
+    name: Managing dbt models governance
+    subskills:
+      - id: 02-01
+        name: Adding contracts to models to ensure the shape of models
+      - id: 02-02
+        name: Creating different versions of our models and deprecating the old ones
+      - id: 02-03
+        name: Defining constraints in YAML to enforce data integrity at the platform level
+
+  - id: "03"
+    slug: debugging-modeling-errors
+    name: Debugging data modeling errors
+    subskills:
+      - id: 03-01
+        name: Understanding logged error messages
+      - id: 03-02
+        name: Troubleshooting using compiled code
+      - id: 03-03
+        name: Troubleshooting .yml compilation errors
+      - id: 03-04
+        name: Developing and implementing a fix and testing it prior to merging
+      - id: 03-05
+        name: Managing dbt behavior with flags
+
+  - id: "04"
+    slug: troubleshooting-pipelines
+    name: Troubleshooting and optimizing dbt pipelines
+    subskills:
+      - id: 04-01
+        name: Troubleshooting and managing failure points in the DAG
+      - id: 04-02
+        name: Using dbt clone
+
+  - id: "05"
+    slug: implementing-tests
+    name: Implementing dbt tests
+    subskills:
+      - id: 05-01
+        name: Using generic, singular, custom, custom generic, and unit tests on a wide variety of models and sources
+      - id: 05-02
+        name: Testing assumptions for dbt models and sources
+      - id: 05-03
+        name: Implementing various testing steps in the workflow
+
+  - id: "06"
+    slug: external-dependencies
+    name: Implementing and maintaining external dependencies
+    subskills:
+      - id: 06-01
+        name: Implementing dbt exposures
+      - id: 06-02
+        name: Implementing source freshness
+
+  - id: "07"
+    slug: dbt-state
+    name: Leveraging the dbt state
+    subskills:
+      - id: 07-01
+        name: Understanding state and state selection
+      - id: 07-02
+        name: Using dbt retry

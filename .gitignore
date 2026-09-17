@@ -1,0 +1,8 @@
+vendor/
+__pycache__/
+.venv*/
+.DS_Store
+
+# (c) dbt Labs -- personal study copies, never published
+exam/study-guide.pdf
+exam/sample-questions.md

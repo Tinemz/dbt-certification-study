@@ -1,0 +1,159 @@
+# Practice questions for Topic 05 -- Implementing dbt tests.
+# Original questions written from exam/topics.yml + the vendored official docs.
+
+- id: tst-001
+  topic: "05"
+  subskill: 05-01
+  type: multiple-choice
+  stem: >-
+    A model contains a complex case-when with many branches plus date math. The team wants to
+    validate the logic against handcrafted inputs before the model is ever built in production.
+    Which kind of test fits?
+  options:
+    a: "A singular test, written as a SQL file that returns failing rows"
+    b: "A generic not_null test applied to the output column"
+    c: "A unit test, which validates SQL logic against static fixture inputs before materialization"
+    d: "A source freshness check on the upstream tables"
+  answer: [c]
+  explanation: >-
+    Data tests -- generic and singular -- can only run after a model is built, and they assess the
+    resulting data. Unit tests validate modeling logic against a small set of static inputs before
+    materializing the model, which is exactly what suits complex conditional logic and date math.
+  docs_ref: website/docs/docs/build/unit-tests.md
+
+- id: tst-002
+  topic: "05"
+  subskill: 05-01
+  type: multiple-choice
+  stem: >-
+    A team needs the same non-standard assertion applied to columns across fifteen different
+    models. What is the right implementation?
+  options:
+    a: "A singular test file per model, each with the model name hard-coded"
+    b: "A custom generic test defined in a test block macro, then referenced by name in each model's YAML"
+    c: "A unit test with fixtures covering all fifteen models"
+    d: "Fifteen copies of an accepted_values test in schema.yml"
+  answer: [b]
+  explanation: >-
+    A custom generic test is defined once as a parameterized test block and then applied by name to
+    any model or column in YAML -- the DRY answer for a reusable assertion. Singular tests are
+    one-off SQL files tied to a specific case, and unit tests validate logic against fixtures rather
+    than asserting on built data.
+  docs_ref: website/docs/best-practices/custom-generic-tests.md
+
+- id: tst-003
+  topic: "05"
+  subskill: 05-02
+  type: multiple-choice
+  stem: >-
+    A not_null test on a large incremental model scans the entire table on every run, which is
+    expensive. Which test configuration limits the scanned data without weakening the assertion on
+    new rows?
+  options:
+    a: "limit, capping the number of rows the test reads"
+    b: "where, restricting the test to a recent slice of the data"
+    c: "store_failures, reusing the previous run's failure table"
+    d: "severity: warn, so the test no longer blocks the run"
+  answer: [b]
+  explanation: >-
+    The where config adds a condition to the test query, so it can be scoped to recent partitions
+    rather than the full history. store_failures persists failing rows for inspection but does not
+    reduce what is scanned, and severity only changes how a failure is reported, not its cost.
+  docs_ref: website/docs/reference/resource-configs/where.md
+
+- id: tst-004
+  topic: "05"
+  subskill: 05-03
+  type: multiple-choice
+  stem: >-
+    According to dbt's best-practice workflows, what is the minimum testing bar every model in a
+    project should meet?
+  options:
+    a: "Every column should have a not_null test"
+    b: "Every model should have a primary key tested for uniqueness and not null"
+    c: "Every model should have at least one singular test written for it"
+    d: "Only models consumed by exposures need tests"
+  answer: [b]
+  explanation: >-
+    The recommended minimum is that every model has a primary key tested to be unique and not null.
+    That catches grain and duplication errors, which are the failures most likely to silently
+    corrupt downstream joins. Testing every single column is redundant and costly, and restricting
+    tests to models behind exposures leaves the rest of the DAG unguarded.
+  docs_ref: website/docs/best-practices/best-practice-workflows.md
+
+- id: tst-005
+  topic: "05"
+  subskill: 05-01
+  type: matching
+  stem: Match each testing need to the dbt test type that addresses it.
+  pairs:
+    - left: Validate SQL logic against handcrafted inputs before the model is ever built
+      right: Unit test
+    - left: Assert a column has no nulls, declared by name in YAML
+      right: Generic data test
+    - left: A one-off assertion expressed as a SQL query returning failing rows
+      right: Singular data test
+    - left: A reusable parameterized assertion applied by name across many models
+      right: Custom generic data test
+  explanation: >-
+    The decisive split is when they run. Unit tests validate modeling logic against static fixtures
+    before materialization. All data tests -- generic, singular, and custom generic -- run against
+    data after the model is built.
+  docs_ref: website/docs/docs/build/unit-tests.md
+
+- id: tst-006
+  topic: "05"
+  subskill: 05-01
+  type: domc
+  stem: >-
+    For each statement about unit tests versus data tests, decide whether it is true.
+  domc_options:
+    - text: "Unit tests run against static fixture inputs you define, not against warehouse data"
+      keyed: true
+    - text: "Unit tests can catch a bug before the model is materialized in production"
+      keyed: true
+    - text: "Data tests, generic or singular, only run after the model has been built"
+      keyed: true
+    - text: "A generic not_null test can validate transformation logic before the model is built"
+      keyed: false
+    - text: "Unit tests are recommended for simple aggregations such as min() and max()"
+      keyed: false
+  explanation: >-
+    Unit tests exist precisely to validate logic before materialization, which no data test can do.
+    The docs explicitly discourage unit testing functions like min(), since the warehouse already
+    tests those extensively and fixture data would not be informative.
+  docs_ref: website/docs/docs/build/unit-tests.md
+
+- id: tst-007
+  topic: "05"
+  subskill: 05-02
+  type: fill-in-blank
+  stem: >-
+    Which test config restricts a data test to a subset of rows, so an expensive test on a large
+    incremental model does not scan the full table? Type the config key.
+  answer: ["where"]
+  answer_note: case-insensitive
+  explanation: >-
+    The where config appends a condition to the test query, scoping it to a recent slice. limit does
+    not exist as a test config, store_failures persists failures without reducing the scan, and
+    severity only changes how a failure is reported.
+  docs_ref: website/docs/reference/resource-configs/where.md
+
+- id: tst-008
+  topic: "05"
+  subskill: 05-03
+  type: build-list
+  stem: >-
+    Put these testing steps in the order they occur during a single dbt build of a staging model
+    that feeds a mart.
+  sequence:
+    - "Unit tests on the staging model run against static fixtures"
+    - "The staging model is materialized in the warehouse"
+    - "Data tests on the staging model run against the built relation"
+    - "The mart model builds, or is skipped if a staging test failed"
+    - "Data tests on the mart run against the built mart"
+  explanation: >-
+    dbt build interleaves tests with models in DAG order, and unit tests run before materialization
+    because they validate logic rather than data. A failing data test causes its downstream models
+    to be skipped, which is the mechanism that stops bad data propagating.
+  docs_ref: website/docs/reference/commands/build.md

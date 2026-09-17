@@ -1,0 +1,148 @@
+# Practice questions for Topic 04 -- Troubleshooting and optimizing dbt pipelines.
+# Original questions written from exam/topics.yml + the vendored official docs.
+
+- id: dag-101
+  topic: "04"
+  subskill: 04-01
+  type: multiple-choice
+  stem: >-
+    A dbt build fails partway through a 400-node DAG because of a transient warehouse connection
+    drop. Dozens of models completed successfully before the failure. What is the most efficient
+    way to finish the run?
+  options:
+    a: "dbt retry, which re-executes the last invocation from the point of failure"
+    b: "dbt build --full-refresh, to guarantee a consistent end state"
+    c: "dbt build --fail-fast, which resumes from the first failed node"
+    d: "dbt build --select state:modified, comparing against the failed run's manifest"
+  answer: [a]
+  explanation: >-
+    dbt retry re-executes the last invocation from the point of failure, reusing run_results.json
+    so the already-successful nodes are not rebuilt. A full refresh would discard all completed
+    work. --fail-fast controls when a run stops, it does not resume one, and state:modified selects
+    by code changes rather than by failure point.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: cln-001
+  topic: "04"
+  subskill: 04-02
+  type: multiple-choice
+  stem: >-
+    An analytics engineer needs production tables available in their development schema so they can
+    point a BI tool at the changed models and validate dashboards. Which approach fits, and why is
+    deferral not sufficient here?
+  options:
+    a: "Deferral -- it creates the same objects as dbt clone at lower cost"
+    b: "dbt clone, because it creates real warehouse objects that tools outside dbt can query"
+    c: "dbt clone, because deferral cannot be used when the target schema already exists"
+    d: "dbt build --empty, which creates queryable schema-only copies of production tables"
+  answer: [b]
+  explanation: >-
+    Deferral is cheaper and simpler, but it resolves references inside dbt only -- it creates no
+    warehouse objects. dbt clone does create actual objects (zero-copy clones where the platform
+    supports it, otherwise pointer views), which is exactly what lets you test downstream
+    dependencies outside of dbt, such as in a BI tool.
+  docs_ref: website/docs/reference/commands/clone.md
+
+- id: dag-102
+  topic: "04"
+  subskill: 04-01
+  type: multiple-choice
+  code: |
+    12:03:41  1 of 6 OK created sql view model dev.stg_orders ......... [OK in 0.41s]
+    12:03:41  2 of 6 ERROR creating sql table model dev.int_orders .... [ERROR in 1.02s]
+    12:03:42  3 of 6 SKIP relation dev.fct_orders .................... [SKIP]
+    12:03:42  4 of 6 SKIP relation dev.fct_revenue .................. [SKIP]
+    12:03:42  5 of 6 OK created sql view model dev.stg_customers ..... [OK in 0.38s]
+  code_lang: text
+  stem: >-
+    Why did stg_customers build successfully after int_orders errored, while fct_orders and
+    fct_revenue were skipped?
+  options:
+    a: "dbt retries independent branches of the DAG after a failure, but not dependent ones"
+    b: "Skips propagate only to descendants of the failed node; stg_customers is on an unrelated branch"
+    c: "stg_customers is a view, and views are always built regardless of upstream failures"
+    d: "The run used --fail-fast, which halts only the branch containing the failure"
+  answer: [b]
+  explanation: >-
+    A failure marks its downstream nodes as SKIP because their inputs do not exist. Nodes on
+    unrelated branches have no dependency on the failed node, so dbt continues building them. The
+    materialization is irrelevant, and --fail-fast would have stopped the whole run at the error.
+  docs_ref: website/docs/reference/commands/build.md
+
+- id: dag-103
+  topic: "04"
+  subskill: 04-01
+  type: fill-in-blank
+  stem: >-
+    After fixing the model that broke a large run, which selector suffix rebuilds that model and
+    everything downstream of it, without rebuilding its parents? Type just the selector for a model
+    named int_orders.
+  answer: ["int_orders+"]
+  answer_note: case-insensitive; surrounding quotes ignored
+  explanation: >-
+    The trailing + selects the model plus all descendants. +int_orders would select ancestors, which
+    already built successfully, and rebuilding them wastes the work the failed run completed.
+  docs_ref: website/docs/reference/node-selection/graph-operators.md
+
+- id: dag-104
+  topic: "04"
+  subskill: 04-01
+  type: domc
+  stem: >-
+    A dbt build stopped with failures across a large DAG. For each recovery statement, decide
+    whether it is true.
+  domc_options:
+    - text: "dbt retry resumes the invocation from its point of failure using run_results.json"
+      keyed: true
+    - text: "A failed node causes its downstream dependents to be reported as SKIP"
+      keyed: true
+    - text: "--fail-fast makes dbt stop the run at the first failure instead of continuing"
+      keyed: true
+    - text: "dbt retry rebuilds every node in the project to guarantee consistency"
+      keyed: false
+    - text: "Nodes on branches unrelated to the failure are skipped as a precaution"
+      keyed: false
+  explanation: >-
+    Retry resumes rather than restarts, skips propagate only downstream, and --fail-fast changes
+    when the run halts. Unrelated branches keep building, which is why a partial run can leave the
+    warehouse in a mixed state worth checking before retrying.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: cln-002
+  topic: "04"
+  subskill: 04-02
+  type: multiple-choice
+  stem: >-
+    A team runs dbt clone --state path/to/artifacts against Snowflake, and some target relations
+    already exist from an earlier clone. What happens, and which flag changes it?
+  options:
+    a: "Pre-existing relations are recreated by default; --no-clobber preserves them"
+    b: "Pre-existing relations are left untouched by default; --full-refresh recreates them"
+    c: "The command fails on the first existing relation; --force skips it"
+    d: "Existing relations are converted to pointer views; --zero-copy keeps them as clones"
+  answer: [b]
+  explanation: >-
+    By default dbt clone does not recreate relations that already exist in the current target;
+    --full-refresh overrides that. On platforms with zero-copy cloning such as Snowflake, tables are
+    cloned; elsewhere dbt falls back to a pointer view that selects from the source object.
+  docs_ref: website/docs/reference/commands/clone.md
+
+- id: cln-003
+  topic: "04"
+  subskill: 04-02
+  type: matching
+  stem: Match each dbt clone behaviour to the condition that produces it.
+  pairs:
+    - left: A zero-copy clone of the table is created
+      right: The platform supports it (Snowflake, Databricks, BigQuery) and the object is a table in the source environment
+    - left: A pointer view selecting from the source object is created
+      right: The platform does not support zero-copy cloning of tables
+    - left: The relation is left as it is
+      right: It already exists in the current target and --full-refresh was not passed
+    - left: Execution time drops noticeably on a large clone
+      right: A higher thread count is set, since clone statements are independent
+  explanation: >-
+    Clone adapts to the platform: real zero-copy where available, a pointer view otherwise. Because
+    individual clone statements do not depend on one another, raising --threads is the documented
+    way to speed up a large clone.
+  docs_ref: website/docs/reference/commands/clone.md

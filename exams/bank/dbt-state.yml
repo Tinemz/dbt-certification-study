@@ -1,0 +1,312 @@
+# Practice questions for Topic 07 -- Leveraging the dbt state.
+# Original questions written from exam/topics.yml + the vendored official docs.
+
+- id: stt-001
+  topic: "07"
+  subskill: 07-01
+  type: multiple-choice
+  stem: >-
+    A CI job runs dbt build --select state:modified+ --state path/to/artifacts. What does the
+    --state flag point at, and what does the selector do?
+  options:
+    a: "A live warehouse connection; it selects models whose tables changed since the last run"
+    b: "Artifacts from a prior invocation; it selects resources whose code differs from that manifest, plus their descendants"
+    c: "A git ref; it selects models whose files changed in the current branch, plus their ancestors"
+    d: "The target directory of the current run; it selects models that failed previously"
+  answer: [b]
+  explanation: >-
+    --state points at artifacts (notably manifest.json) produced by a previous invocation. The
+    state selector compares the current project code against that manifest to identify new or
+    modified resources. The trailing + extends the selection to descendants, so downstream breakage
+    is caught. Together with deferral this is the basis of slim CI.
+  docs_ref: website/docs/reference/node-selection/state-selection.md
+
+- id: rty-001
+  topic: "07"
+  subskill: 07-02
+  type: multiple-choice
+  stem: >-
+    A dbt run fails immediately with a warehouse connection error, before any node executes. The
+    engineer runs dbt retry. What happens?
+  options:
+    a: "dbt re-runs the entire project from the beginning"
+    b: "dbt has no recorded nodes to retry from, so nothing is run"
+    c: "dbt retries only the connection, then continues with the original run plan"
+    d: "dbt raises an error because retry requires the --state flag"
+  answer: [b]
+  explanation: >-
+    Retry resumes the last invocation from its point of failure, driven by run_results.json. If no
+    nodes executed before the failure -- as with an early connection or permission error -- there is
+    nothing recorded to retry from and retry does nothing. The documented recommendation is to check
+    run_results.json and re-run the full job manually.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: stt-002
+  topic: "07"
+  subskill: 07-01
+  type: domc
+  stem: >-
+    A CI job must build only the models whose code changed in a pull request, plus everything
+    downstream, without building unchanged parents. For each statement presented, decide whether it
+    is true of this setup.
+  domc_options:
+    - text: "--state must point at artifacts produced by a previous invocation, such as a production run"
+      keyed: true
+    - text: "The selector state:modified+ selects changed resources plus their descendants"
+      keyed: true
+    - text: "--defer lets dbt resolve refs to unbuilt upstream models using the state manifest"
+      keyed: true
+    - text: "--state points at the target/ directory produced by the current run"
+      keyed: false
+    - text: "state:modified compares warehouse table contents to detect which models changed"
+      keyed: false
+  explanation: >-
+    Slim CI rests on three pieces: --state pointing at artifacts from a prior invocation,
+    state:modified comparing current project code against that manifest, and --defer resolving
+    unselected, unbuilt upstream refs to the state environment. state comparison is over code, not
+    warehouse data, and the current run's target/ is the output, not the baseline.
+  docs_ref: website/docs/reference/node-selection/state-selection.md
+
+- id: stt-003
+  topic: "07"
+  subskill: 07-01
+  type: fill-in-blank
+  stem: >-
+    Deferral requires a manifest from a previous dbt invocation. Which flag provides the path to
+    that manifest? Type the flag exactly, including its leading dashes.
+  answer: ["--state"]
+  answer_note: case-insensitive; leading dashes optional when grading
+  explanation: >-
+    Defer requires a manifest from a previous invocation, supplied via --state (or the equivalent
+    environment variable). If --defer-state is not specified separately, deferral reuses whatever
+    was passed to --state.
+  docs_ref: website/docs/reference/node-selection/defer.md
+
+- id: stt-004
+  topic: "07"
+  subskill: 07-01
+  type: multiple-choice
+  stem: >-
+    With --defer enabled, under which conditions does dbt resolve a ref() using the state manifest
+    instead of the current target?
+  options:
+    a: "Always -- defer redirects every ref() to the state environment"
+    b: "Only when the node is not among the selected nodes and it does not exist in the database"
+    c: "Only when the node is among the selected nodes but failed to build"
+    d: "Only for ephemeral models, which are always resolved from state"
+  answer: [b]
+  explanation: >-
+    Both conditions must hold: the node is not selected, and it does not exist in the current
+    database (unless --favor-state is used). That is what makes deferral 'fail over' to production
+    only for the upstream models you did not build. Ephemeral models are never deferred, since they
+    act as passthroughs for other ref calls.
+  docs_ref: website/docs/reference/node-selection/defer.md
+
+- id: rty-002
+  topic: "07"
+  subskill: 07-02
+  type: build-list
+  stem: >-
+    A long dbt build fails halfway through because of a transient warehouse error. Put the recovery
+    steps in the correct order, from first to last.
+  sequence:
+    - "Read the error in the failing node's log to confirm the failure is transient"
+    - "Confirm that run_results.json recorded the nodes that already completed"
+    - "Run dbt retry to resume the invocation from its point of failure"
+    - "Verify that the previously successful nodes were not rebuilt"
+  explanation: >-
+    Retry resumes from the point of failure using run_results.json, so the first job is to confirm
+    the failure is worth retrying and that results were actually recorded. If no nodes ran before
+    the failure there is nothing to resume from, and the documented fallback is to re-run the full
+    job manually.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: rty-003
+  topic: "07"
+  subskill: 07-02
+  type: matching
+  stem: Match each command to what it does when recovering or reproducing a previous run.
+  pairs:
+    - left: dbt retry
+      right: Re-executes the last invocation from its point of failure
+    - left: dbt clone
+      right: Creates warehouse objects from a state manifest, queryable outside dbt
+    - left: "dbt build --defer --state"
+      right: Resolves unbuilt upstream refs to another environment without creating objects
+    - left: "dbt build --full-refresh"
+      right: Discards incremental state and rebuilds tables from scratch
+  explanation: >-
+    Retry resumes, clone materializes real objects from state, defer redirects references without
+    building anything, and full-refresh throws away incremental history. They are frequently
+    confused because all four involve a prior state in some form.
+  docs_ref: website/docs/reference/commands/clone.md
+
+- id: stt-005
+  topic: "07"
+  subskill: 07-01
+  type: multiple-choice
+  stem: >-
+    An analyst adds tags: ['finance'] to an existing model in its YAML properties file and changes
+    nothing else. The CI job runs dbt build --select state:modified+ --state prod-artifacts. Is the
+    model rebuilt?
+  options:
+    a: "Yes -- any change to a YAML properties file marks the resource as modified"
+    b: "No -- dbt treats tags and meta as metadata only, so they never trigger state:modified"
+    c: "Yes, but only because the + operator pulls it in as a descendant of itself"
+    d: "Only if persist_docs is enabled for the model"
+  answer: [b]
+  explanation: >-
+    tags and meta do not affect how a resource is materialized, so dbt deliberately excludes them
+    from state comparison at both the resource and the column level. description is the contrasting
+    case -- it counts as a modification, but only when persist_docs is enabled. Every other config
+    change does count, because a config can change materialization.
+  docs_ref: website/docs/reference/node-selection/state-comparison-caveats.md
+
+- id: stt-006
+  topic: "07"
+  subskill: 07-01
+  type: multiple-choice
+  stem: >-
+    A project has two seeds. country_codes.csv is 12 KiB; historical_rates.csv is 4 MiB. Both files
+    have rows edited in place, with no rename and no move. Which seeds does state:modified select?
+  options:
+    a: "Both -- dbt hashes seed contents regardless of size"
+    b: "Only country_codes.csv -- dbt compares contents below 1 MiB and file path at or above it"
+    c: "Only historical_rates.csv -- dbt skips content hashing for small files as an optimization"
+    d: "Neither -- seeds are excluded from state comparison and must be selected explicitly"
+  answer: [b]
+  explanation: >-
+    dbt stores a file hash for seeds smaller than 1 MiB, so editing their contents marks them
+    modified. At 1 MiB or larger dbt cannot compare contents, raises a warning, and falls back to
+    the file path alone -- so an in-place content edit to a large seed goes undetected by
+    state:modified.
+  docs_ref: website/docs/reference/node-selection/state-comparison-caveats.md
+
+- id: stt-007
+  topic: "07"
+  subskill: 07-01
+  type: fill-in-blank
+  stem: >-
+    On dbt Core 1.11, a team wants to set the state path through the environment instead of passing
+    --state on every command. Which environment variable do they set? Type the variable name.
+  answer: ["DBT_ENGINE_STATE"]
+  answer_note: case-insensitive; DBT_STATE is the pre-1.11 name and is not accepted here
+  explanation: >-
+    From 1.11 the state and defer environment variables carry the DBT_ENGINE_ prefix --
+    DBT_ENGINE_STATE, DBT_ENGINE_DEFER and DBT_ENGINE_DEFER_STATE. Versions up to 1.10 used
+    DBT_STATE, DBT_DEFER and DBT_DEFER_STATE. When both a flag and an env var are set, the flag
+    takes precedence.
+  docs_ref: website/docs/reference/node-selection/configure-state.md
+
+- id: stt-008
+  topic: "07"
+  subskill: 07-01
+  type: matching
+  stem: >-
+    Match each state:modified subselector to the single change it detects.
+  pairs:
+    - left: "state:modified.body"
+      right: The model SQL or the values in a seed
+    - left: "state:modified.relation"
+      right: The database, schema or alias the node lands in
+    - left: "state:modified.macros"
+      right: An upstream macro, called directly or through another macro
+    - left: "state:modified.contract"
+      right: The name or data_type of a column under an enforced contract
+  explanation: >-
+    Subselectors exist because full state:modified is broad. body covers node contents, relation
+    covers the database representation, macros covers upstream macro lineage at any depth, and
+    contract covers column name and data_type. Note that state:modified.configs deliberately
+    excludes database, schema, alias, tags and meta -- relation is the subselector that owns the
+    first three.
+  docs_ref: website/docs/reference/node-selection/methods.md
+
+- id: stt-009
+  topic: "07"
+  subskill: 07-01
+  type: hotspot
+  format_source: inferred
+  stem: >-
+    This CI script is meant to build only the models changed in the pull request plus their
+    descendants, without building unchanged parents. It fails with a database error because an
+    upstream model does not exist in the CI schema. Click the line responsible for the failure.
+  code: |
+    git clone --branch main "$REPO_URL" main-checkout
+    dbt deps
+    aws s3 cp s3://artifacts/prod/manifest.json ./prod-artifacts/
+    dbt compile --target ci
+    dbt build --select "state:modified+" --defer --target ci
+    dbt source freshness --target ci
+  code_lang: text
+  answer_line: 5
+  explanation: >-
+    Deferral requires both --defer and --state. Line 5 passes --defer but never points dbt at the
+    downloaded artifacts, so refs to unselected upstream models resolve to the empty CI schema
+    instead of production and the build errors. The manifest was fetched on line 3; the fix is
+    --state ./prod-artifacts on line 5. Without --state the state:modified selector has no
+    comparison manifest either.
+  docs_ref: website/docs/reference/node-selection/defer.md
+
+- id: stt-010
+  topic: "07"
+  subskill: 07-01
+  type: domc
+  stem: >-
+    A developer runs dbt run --select "model_b" --defer --state prod-artifacts in their personal
+    schema. For each statement, decide whether it is true of how dbt resolves ref calls here.
+  domc_options:
+    - text: "An unselected parent that does not exist in the developer's schema resolves to the state manifest"
+      keyed: true
+    - text: "An unselected parent that already exists in the developer's schema is used from that schema, not from state"
+      keyed: true
+    - text: "Passing --favor-state makes dbt prefer the state definition even when the object exists locally"
+      keyed: true
+    - text: "Ephemeral parents are never deferred"
+      keyed: true
+    - text: "Every ref in the selected model resolves to the state manifest, including selected nodes"
+      keyed: false
+    - text: "Deferral works from --defer alone once a prior run has written to target/"
+      keyed: false
+  explanation: >-
+    dbt defers a ref only when the node is not among the selected nodes AND it does not exist in
+    the database -- unless --favor-state is passed, which prioritizes the state definition except
+    for nodes that are themselves selected. Ephemeral models are never deferred because they are
+    passthroughs for other ref calls. Deferral always requires --state alongside --defer.
+  docs_ref: website/docs/reference/node-selection/defer.md
+
+- id: rty-004
+  topic: "07"
+  subskill: 07-02
+  type: multiple-choice
+  stem: >-
+    On dbt Core 1.11, a job ran dbt build --select "tag:nightly" --exclude "tag:slow" and failed
+    partway through. The engineer wants to resume, but restricted to a single model. Can they run
+    dbt retry --select "orders"?
+  options:
+    a: "Yes -- retry accepts --select and narrows the resumed set to the matching nodes"
+    b: "No -- retry reuses the prior invocation's selection, and selectors cannot be overridden on dbt Core"
+    c: "Yes, but only if the original command also used --select"
+    d: "No -- retry accepts no flags at all and always resumes the entire failed invocation"
+  answer: [b]
+  explanation: >-
+    On dbt Core, retry inherits the previous command's --select, --exclude and --selector and does
+    not let you override them. Narrowing the retry scope with new selectors is a Fusion (v2.0)
+    capability, so it is out of scope for a 1.11 exam. Retry does accept other overrides on Core,
+    including --threads, --vars, --target, --full-refresh and --state.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: rty-005
+  topic: "07"
+  subskill: 07-02
+  type: fill-in-blank
+  stem: >-
+    dbt retry determines where to resume by reading one artifact from the previous invocation.
+    Name that file, including its extension.
+  answer: ["run_results.json", "run results.json"]
+  answer_note: case-insensitive
+  explanation: >-
+    Retry references run_results.json, which records the success or error status of each node in
+    the last invocation. This is why a failure that occurs before any node executes leaves retry
+    with nothing to do -- and why --state on dbt retry means "a directory containing
+    run_results.json", defaulting to the target directory, rather than a comparison manifest.
+  docs_ref: website/docs/reference/commands/retry.md

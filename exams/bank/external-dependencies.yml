@@ -1,0 +1,139 @@
+# Practice questions for Topic 06 -- Implementing and maintaining external dependencies.
+# Original questions written from exam/topics.yml + the vendored official docs.
+
+- id: exp-001
+  topic: "06"
+  subskill: 06-01
+  type: multiple-choice
+  stem: >-
+    A BI dashboard is built on fct_orders and dim_customers. The team wants dbt to know about this
+    downstream consumer so they can run and test everything feeding it, and surface it in the docs
+    site. What should they define, and how are its dependencies declared?
+  options:
+    a: "A source, with the dashboard listed under tables:"
+    b: "An exposure, with depends_on listing ref() and source() calls"
+    c: "A model with materialized: ephemeral that selects from both models"
+    d: "A group, with the dashboard listed as an owner"
+  answer: [b]
+  explanation: >-
+    Exposures define and describe a downstream use of the project such as a dashboard, application,
+    or data science pipeline. They are declared under an exposures: key with depends_on listing
+    ref(), source(), or metric() calls, which lets you select the upstream resources feeding them
+    and gives them a dedicated page in the generated documentation.
+  docs_ref: website/docs/docs/build/exposures.md
+
+- id: frs-001
+  topic: "06"
+  subskill: 06-02
+  type: multiple-choice
+  stem: >-
+    A source is configured with freshness warn_after 12 hours and error_after 24 hours. The most
+    recent record is 30 hours old. What does dbt source freshness do?
+  options:
+    a: "Reports a warning and exits with code 0, since freshness never blocks a pipeline"
+    b: "Reports an error for that source and exits with a nonzero exit code"
+    c: "Skips the check because the source exceeded both thresholds and is considered stale-safe"
+    d: "Rebuilds the downstream models to refresh the data automatically"
+  answer: [b]
+  explanation: >-
+    dbt source freshness queries the source tables and compares the loaded_at_field against the
+    configured thresholds. Past error_after, the source is in a stale state and dbt exits with a
+    nonzero exit code -- which is what allows an orchestrator to halt the pipeline. It reports
+    staleness; it never rebuilds data on its own.
+  docs_ref: website/docs/reference/commands/source.md
+
+- id: exp-002
+  topic: "06"
+  subskill: 06-01
+  type: multiple-choice
+  code: |
+    exposures:
+      - name: Weekly Jaffle Metrics
+        type: dashboard
+        maturity: high
+        url: https://bi.tool/dashboards/1
+        owner:
+          name: Data Team
+          email: data@example.com
+        depends_on:
+          - ref('fct_orders')
+  code_lang: yaml
+  stem: >-
+    This exposure definition is rejected. What is wrong with it?
+  options:
+    a: "depends_on must list at least two resources"
+    b: "The name contains spaces -- exposure names allow only letters, numbers and underscores"
+    c: "maturity: high is not a valid value; only medium and low are allowed"
+    d: "owner must include a Slack handle in addition to name and email"
+  answer: [b]
+  explanation: >-
+    Exposure names must contain only letters, numbers, and underscores. A human-friendly string with
+    spaces and title casing belongs in the label property instead. maturity accepts high, medium and
+    low, and owner supports name and email only.
+  docs_ref: website/docs/reference/exposure-properties.md
+
+- id: exp-003
+  topic: "06"
+  subskill: 06-01
+  type: fill-in-blank
+  stem: >-
+    An exposure name cannot contain spaces. Which property holds the human-friendly version of the
+    name, with spaces and title casing, for display in the docs site? Type the property name.
+  answer: ["label"]
+  answer_note: case-insensitive; trailing colon optional
+  explanation: >-
+    label carries the display name. The name property is the machine identifier, restricted to
+    letters, numbers and underscores, and is what selection syntax matches against.
+  docs_ref: website/docs/reference/exposure-properties.md
+
+- id: frs-002
+  topic: "06"
+  subskill: 06-02
+  type: multiple-choice
+  code: |
+    sources:
+      - name: jaffle_shop
+        database: raw
+        config:
+          freshness:
+            warn_after: {count: 12, period: hour}
+            error_after: {count: 24, period: hour}
+          loaded_at_field: _etl_loaded_at
+        tables:
+          - name: orders
+          - name: customers
+            config:
+              freshness: null
+  code_lang: yaml
+  stem: >-
+    What is the effect of the configuration on the customers table?
+  options:
+    a: "customers inherits the source-level thresholds, because null is ignored for tables"
+    b: "customers is excluded from freshness checks, overriding the source-level default"
+    c: "The YAML fails to parse, because freshness cannot be null"
+    d: "customers is checked but always reported as fresh"
+  answer: [b]
+  explanation: >-
+    Freshness set at the source level acts as a default for its tables, and a table can override it.
+    Setting it to null on a specific table opts that table out of the check -- useful for a
+    reference table that legitimately does not change.
+  docs_ref: website/docs/docs/build/sources.md
+
+- id: frs-003
+  topic: "06"
+  subskill: 06-02
+  type: build-list
+  stem: >-
+    An orchestrator should stop the pipeline when upstream data is stale. Put the steps in the order
+    they happen.
+  sequence:
+    - "Declare freshness thresholds and loaded_at_field on the source in YAML"
+    - "Run dbt source freshness as the first step of the pipeline"
+    - "dbt queries each source table and compares its newest record against the thresholds"
+    - "A source past error_after causes dbt to exit with a nonzero exit code"
+    - "The orchestrator halts before the transformation models run"
+  explanation: >-
+    Freshness is a gate you place ahead of the build. dbt reports staleness and signals it through
+    the exit code; acting on that signal is the orchestrator's job, since dbt never refreshes source
+    data itself.
+  docs_ref: website/docs/reference/commands/source.md

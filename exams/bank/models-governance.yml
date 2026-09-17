@@ -1,0 +1,343 @@
+# Practice questions for Topic 02 -- Managing dbt models governance.
+# Original questions written from exam/topics.yml + the vendored official docs.
+
+- id: ctr-001
+  topic: "02"
+  subskill: 02-01
+  type: multiple-choice
+  stem: >-
+    A team sets contract.enforced: true on a model but lists only the column names under columns:,
+    without data_type. What happens when the model builds?
+  options:
+    a: "It builds normally -- data_type is optional and inferred from the compiled SQL"
+    b: "It fails, because an enforced contract requires both name and data_type for every column"
+    c: "It builds with a warning, and dbt backfills data_type into the manifest"
+    d: "It fails only if the model is materialized as a view"
+  answer: [b]
+  explanation: >-
+    When a contract is enforced, it must include every column's name and data_type, using a type
+    the data platform understands. dbt verifies the model's transformation produces a dataset
+    matching the contract before building, and fails the build otherwise.
+  docs_ref: website/docs/docs/mesh/govern/model-contracts.md
+
+- id: ver-001
+  topic: "02"
+  subskill: 02-02
+  type: multiple-choice
+  stem: >-
+    Which change to a contracted model requires creating a new model version rather than editing
+    the existing one in place?
+  options:
+    a: "Adding a new column to the model's output"
+    b: "Fixing a bug in an existing column's calculation without changing its name or type"
+    c: "Removing a column that downstream consumers currently select"
+    d: "Adding a description to an existing column in the YAML"
+  answer: [c]
+  explanation: >-
+    Removing or renaming a column, or changing its data type or nullability, breaks the contract's
+    guarantees and warrants a new version. Non-breaking changes -- adding a column, fixing a
+    calculation that preserves name and type, editing documentation -- do not require a version bump.
+  docs_ref: website/docs/docs/mesh/govern/model-versions.md
+
+- id: cns-001
+  topic: "02"
+  subskill: 02-03
+  type: multiple-choice
+  stem: >-
+    A team adds a primary_key constraint to a model on Snowflake and expects the warehouse to
+    reject duplicate values. What actually happens, and which config silences the resulting warning?
+  options:
+    a: "Snowflake enforces the constraint; no warning is produced"
+    b: "The constraint is informational only and not enforced; warn_unenforced: False silences the warning"
+    c: "The constraint is unsupported and omitted from the DDL; warn_unsupported: False silences the warning"
+    d: "dbt enforces it in the compiled SQL by adding a distinct clause; no warning is produced"
+  answer: [b]
+  explanation: >-
+    Most analytical platforms support and enforce only not_null; others, like primary_key on
+    Snowflake, are supported but not enforced -- included in the templated DDL as informational
+    metadata. warn_unenforced: False skips that warning. warn_unsupported: False is for constraints
+    the platform does not support at all, such as check on Redshift, which are omitted from the DDL.
+  docs_ref: website/docs/reference/resource-properties/constraints.md
+
+- id: ctr-002
+  topic: "02"
+  subskill: 02-01
+  type: multiple-choice
+  code: |
+    models:
+      - name: dim_customers
+        config:
+          contract:
+            enforced: true
+        columns:
+          - name: customer_id
+          - name: customer_name
+            data_type: varchar
+  code_lang: yaml
+  stem: >-
+    This YAML accompanies a model materialized as a table. What happens on dbt run, and why?
+  options:
+    a: "It builds -- data_type is only required for columns carrying constraints"
+    b: "It fails -- an enforced contract requires data_type on every column, and customer_id has none"
+    c: "It builds with a warning that customer_id will not be type-checked"
+    d: "It fails -- contracts cannot be declared under config:, only at the model's top level"
+  answer: [b]
+  explanation: >-
+    When a contract is enforced it must include every column's name and data_type. customer_id
+    declares only a name, so the contract is incomplete and the build fails. Declaring the contract
+    under config: is correct syntax and not the problem here.
+  docs_ref: website/docs/docs/mesh/govern/model-contracts.md
+
+- id: ver-002
+  topic: "02"
+  subskill: 02-02
+  type: build-list
+  stem: >-
+    A producer team needs to remove a column from a contracted model that several teams query. Put
+    the model-versioning steps in the order the docs recommend.
+  sequence:
+    - "Develop the new version alongside the existing one"
+    - "Bump latest_version so new ref() calls resolve to the new version"
+    - "Set a deprecation_date on the old version to give consumers a migration window"
+    - "Update downstream references to the new version"
+    - "Remove the old version once the deprecation date passes"
+  explanation: >-
+    The documented pathway is develop, bump the latest, slate the old version for deprecation,
+    let consumers migrate, then remove. The deprecation date is what puts a known boundary on the
+    cost of migration -- removing the old version first would break consumers immediately.
+  docs_ref: website/docs/docs/mesh/govern/model-versions.md
+
+- id: ver-003
+  topic: "02"
+  subskill: 02-02
+  type: domc
+  stem: >-
+    A model has an enforced contract. For each change presented, decide whether it requires
+    creating a new model version.
+  domc_options:
+    - text: "Renaming an existing column"
+      keyed: true
+    - text: "Changing a column's data type from int to varchar"
+      keyed: true
+    - text: "Removing a column that downstream models select"
+      keyed: true
+    - text: "Adding a new column to the model's output"
+      keyed: false
+    - text: "Fixing a bug in a calculation without changing the column's name or type"
+      keyed: false
+    - text: "Adding a description to an existing column"
+      keyed: false
+  explanation: >-
+    A new version is warranted when the change breaks the contract's guarantees: renaming,
+    removing, or changing a column's type or nullability. Additive and cosmetic changes -- a new
+    column, a corrected calculation that preserves name and type, documentation -- do not.
+  docs_ref: website/docs/docs/mesh/govern/model-versions.md
+
+- id: cns-002
+  topic: "02"
+  subskill: 02-03
+  type: matching
+  stem: Match each constraint situation to the correct dbt configuration response.
+  pairs:
+    - left: Supported by the platform but not enforced, e.g. primary_key on Snowflake
+      right: "warn_unenforced: False -- constraint stays in the templated DDL"
+    - left: Not supported by the platform at all, e.g. check on Redshift
+      right: "warn_unsupported: False -- constraint is omitted from the DDL"
+    - left: Supported and enforced on nearly every analytical platform
+      right: "not_null -- the one constraint you can rely on being enforced"
+    - left: Required before any constraint can be declared on a model
+      right: "An enforced contract with data_type on every column"
+  explanation: >-
+    Most analytical platforms enforce only not_null. Others are either informational (supported,
+    unenforced) or dropped entirely (unsupported), and the two warn_ flags silence each case
+    separately. Constraints are only available on models with an enforced contract, materialized as
+    table or incremental.
+  docs_ref: website/docs/reference/resource-properties/constraints.md
+
+- id: cns-003
+  topic: "02"
+  subskill: 02-03
+  type: hotspot
+  format_source: inferred
+  code: |
+    models:
+      - name: dim_customers
+        config:
+          materialized: view
+          contract:
+            enforced: true
+        columns:
+          - name: customer_id
+            data_type: integer
+            constraints:
+              - type: not_null
+  code_lang: yaml
+  stem: >-
+    The not_null constraint here is never enforced by the platform. Click the line that explains why.
+  answer_line: 4
+  explanation: >-
+    Line 4 materializes the model as a view. Constraints are only applied on models materialized as
+    table or incremental, because they are expressed in the DDL that creates the relation. The
+    contract itself is still enforced at build time -- it is the platform-level constraint that
+    silently does nothing.
+  docs_ref: website/docs/reference/resource-properties/constraints.md
+
+- id: ver-004
+  topic: "02"
+  subskill: 02-02
+  type: multiple-choice
+  code: |
+    models:
+      - name: dim_customers
+        latest_version: 2
+        versions:
+          - v: 3
+          - v: 2
+          - v: 1
+  code_lang: yaml
+  stem: >-
+    A downstream model contains {{ ref('dim_customers') }} with no version argument. Which version
+    does it resolve to, and how are the other two classified?
+  options:
+    a: "v3, because unpinned refs always resolve to the highest version identifier; v2 and v1 are old"
+    b: "v2, because latest_version is set explicitly; v3 is prerelease and v1 is old"
+    c: "v1, because unpinned refs resolve to the oldest supported version; v2 and v3 are prerelease"
+    d: "The build fails -- a versioned model cannot be referenced without a version argument"
+  answer: [b]
+  explanation: >-
+    Unpinned refs resolve to latest_version, not to the greatest identifier. The highest version
+    wins only when latest_version is not declared. Versions above the latest are prerelease, versions
+    below it are old, so v3 is prerelease and v1 is old.
+  docs_ref: website/docs/reference/resource-properties/latest_version.md
+
+- id: ver-005
+  topic: "02"
+  subskill: 02-02
+  type: fill-in-blank
+  stem: >-
+    Which selector lists only the models in a project that are NOT versioned? Type the full
+    selector value as it would be passed to --select.
+  answer: ["version:none", "none"]
+  answer_note: "case-insensitive; accepted with or without the version: prefix"
+  explanation: >-
+    The version method takes four values: latest, prerelease, old, and none. version:none selects
+    models that are not versioned at all, which is the complement of the other three.
+  docs_ref: website/docs/reference/node-selection/methods.md
+
+- id: ver-006
+  topic: "02"
+  subskill: 02-02
+  type: matching
+  stem: Match each deprecation scenario to what dbt produces.
+  pairs:
+    - left: Parsing a project that defines a model with a deprecation_date
+      right: "DeprecatedModel warning, raised for the producer"
+    - left: Referencing a model whose deprecation_date has already passed
+      right: "DeprecatedReference warning, raised for producer and consumers"
+    - left: Referencing a model whose deprecation_date is in the future
+      right: "UpcomingReferenceDeprecation warning, raised for producer and consumers"
+    - left: Turning any of these warnings into a build failure
+      right: "WARN_ERROR_OPTIONS, which promotes selected warnings to runtime errors"
+  explanation: >-
+    All three deprecation signals are warnings, differing in who sees them and whether the date has
+    passed. None of them stops a build on its own -- only WARN_ERROR_OPTIONS promotes them to errors.
+  docs_ref: website/docs/reference/resource-properties/deprecation_date.md
+
+- id: ver-007
+  topic: "02"
+  subskill: 02-02
+  type: domc
+  stem: >-
+    A model carries deprecation_date: 2026-01-01, a date that has already passed. For each
+    statement, decide whether it is true.
+  domc_options:
+    - text: "Referencing the model produces a warning rather than an error"
+      keyed: true
+    - text: "dbt keeps building the model until it is disabled or removed from the project"
+      keyed: true
+    - text: "deprecation_date can be used on a model that has no versions declared"
+      keyed: true
+    - text: "dbt drops the model's relation from the warehouse once the date passes"
+      keyed: false
+    - text: "dbt skips the model during build once the date passes"
+      keyed: false
+    - text: "A dedicated node selection method exists to select models by deprecation_date"
+      keyed: false
+  explanation: >-
+    A deprecation date is a communication mechanism, not an action. dbt warns, but keeps building
+    the model and never drops its relation -- the same way it does not drop relations for deleted
+    models. Deprecation works with or without model versions, and there is no selection syntax for
+    it; the documented approach is dbt ls with --output json --output-keys.
+  docs_ref: website/docs/reference/resource-properties/deprecation_date.md
+
+- id: cns-004
+  topic: "02"
+  subskill: 02-03
+  type: multiple-choice
+  stem: >-
+    A model on Postgres has a not_null constraint on customer_id and also a not_null test on the
+    same column. A batch of rows arrives with customer_id null. What is the difference in outcome?
+  options:
+    a: "Both fail after the table is built; the constraint reports as a test failure alongside the test"
+    b: "The constraint fails the write and rolls back, so the rows never land; the test would have flagged them only after the table was built"
+    c: "The constraint drops the offending rows and lets the build succeed; the test then passes"
+    d: "The test runs first and blocks the build, so the constraint never evaluates"
+  answer: [b]
+  explanation: >-
+    A constraint is validated by the data platform as rows are written: the operation fails, is
+    rolled back, and the invalid data never lands in the table. A dbt test is a query executed after
+    the model is built, so the bad rows exist in the warehouse until the test reports them. dbt never
+    silently drops offending rows.
+  docs_ref: website/docs/reference/resource-properties/constraints.md
+
+- id: cns-005
+  topic: "02"
+  subskill: 02-03
+  type: fill-in-blank
+  stem: >-
+    On Snowflake, Redshift and BigQuery, exactly one constraint type is both definable and actually
+    enforced by the platform. Name that constraint type.
+  answer: ["not_null", "not null"]
+  answer_note: case-insensitive
+  explanation: >-
+    Most analytical platforms support and enforce only not_null. primary_key, foreign_key and
+    unique are definable on several of them but informational only, and check is not definable at
+    all on Snowflake, Redshift or BigQuery. Transactional databases such as Postgres enforce the
+    full ANSI set plus check.
+  docs_ref: website/docs/reference/resource-properties/constraints.md
+
+- id: cns-006
+  topic: "02"
+  subskill: 02-03
+  type: multiple-choice
+  code: |
+    models:
+      - name: fct_orders
+        config:
+          materialized: table
+          contract:
+            enforced: true
+        columns:
+          - name: order_id
+            data_type: integer
+            constraints:
+              - type: primary_key
+          - name: line_number
+            data_type: integer
+            constraints:
+              - type: primary_key
+  code_lang: yaml
+  stem: >-
+    The team wants a composite primary key over order_id and line_number. Why is this YAML wrong,
+    and what is the fix?
+  options:
+    a: "Nothing is wrong -- dbt combines column-level primary_key constraints into a composite key"
+    b: "Multiple primary_key constraints at the column level are not supported; declare one model-level constraint with columns: [order_id, line_number]"
+    c: "Composite keys require a check constraint with an expression instead"
+    d: "Each primary_key needs a name: property to disambiguate them at the column level"
+  answer: [b]
+  explanation: >-
+    Defining multiple primary_key constraints at the column level is not supported. A constraint
+    spanning more than one column belongs at the model level, where the columns: list names the
+    columns it applies to. Single-column constraints are still recommended directly on the column.
+  docs_ref: website/docs/reference/resource-properties/constraints.md
