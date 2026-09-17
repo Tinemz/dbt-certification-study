@@ -45,26 +45,26 @@ The backbone follows the official learning path checkpoints in `exam/learning-pa
 
 ### Days 1–3 · Topics 07 and 02
 
-Weakest at diagnostic and the cheapest to close — 5 sub-skills between them.
+The diagnostic ranked these lowest, and they are the cheapest to close — 5 sub-skills between them.
 
 - **07** state and state selection, `dbt retry`. Covers `--state`, deferral, Slim CI, `dbt clone`
   vs deferral. These four interlock; study them as one unit.
-- **02** contracts, model versions, constraints. Contracts are already solid; versions and
-  constraints are not.
+- **02** contracts, model versions, constraints — the guide treats governance as one block, so the
+  phase does too.
 - Learning path: Checkpoint 2 (govern and debug) + Checkpoint 3 (state, clone, retry).
 
 ### Days 4–6 · Topics 04 and 06, plus the misconceptions
 
 - **04** DAG failure points, `dbt clone`. **06** exposures, source freshness.
-- Then the three misconceptions from the diagnostic — highest priority of anything in this plan,
-  because a confident wrong answer gives no signal to check.
+- Then every misconception the diagnostic surfaced — answered confidently and wrongly. Highest
+  priority of anything in a plan, because a confident wrong answer gives no signal to check.
 - Learning path: Checkpoint 3.
 
 ### Days 7–10 · Topics 01 and 05
 
-The largest share of the exam — topic 01 alone is 14 of 31 sub-skills. Usually the strongest area
-by this point, so treat it as consolidation rather than discovery. Do not spend days here on
-sub-skills already marked `strong`.
+The largest share of the exam — topic 01 alone is 14 of 31 sub-skills. For someone already working
+in dbt this is usually consolidation rather than discovery, so it sits late. Do not spend days here
+on sub-skills already marked `strong`.
 
 - Learning path: Checkpoint 1 (materializations, incremental, snapshots, Jinja, packages, Python
   models) + Checkpoint 3 (testing).
@@ -100,9 +100,10 @@ Rescheduling is free up to 24 hours before; no-shows are not refunded.
 
 ## Rules that keep this honest
 
-- **Declare confidence truthfully**, including "chute". The quadrant analysis is the
-  only thing that separates real knowledge from a lucky guess, and it already caught one: `03-05`
-  scored as a lucky guess at diagnostic, then came back as a confident wrong answer.
+- **Declare confidence truthfully**, including "chute". The quadrant analysis is the only thing
+  that separates real knowledge from a lucky guess — the same sub-skill can score as a lucky guess
+  in one attempt and as a confident wrong answer in the next, and only the confidence data shows
+  it.
 - **Record every drill in `exams/attempts/`**, or `progress.yml` drifts and the plan starts
   aiming at the wrong sub-skills.
 - **A passing practice score is not readiness.** 12-question drills move ±8% per question.

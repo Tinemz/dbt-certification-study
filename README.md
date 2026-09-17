@@ -11,6 +11,40 @@ file in the vendored docs.
 
 [guide]: https://www.getdbt.com/dbt-assets/certifications/dbt-certificate-study-guide-version-1-11
 
+## Why this exists
+
+Studying for this exam means answering two questions over and over: *what is actually on it*, and
+*what does dbt actually do*. Each has exactly one honest source — the official outline and the
+official documentation. Everything else, including an LLM answering from memory, is a guess in a
+confident tone.
+
+So the sources are wired into the workflow rather than trusted to discipline:
+
+- **Nothing is answered from memory.** The dbt docs are vendored locally and every question carries
+  a `docs_ref` into them. `validate_bank.py` refuses to pass a question whose reference does not
+  resolve, so a broken source fails loudly instead of quietly teaching the wrong thing.
+- **The questions are original.** The guide's own 10 samples are © dbt Labs and never enter the
+  bank — and memorising 10 questions would not help anyway.
+- **Confidence is recorded with every answer**, because a lucky guess and real knowledge score the
+  same. The report separates them, and a confident wrong answer outranks everything else in the
+  plan: nothing signals you to go check it.
+- **The plan comes from a diagnostic**, not from a template. `/onboarding` measures first, then
+  orders the topics.
+
+Built while preparing for the exam, and kept working after it.
+
+## What is in here today
+
+| | |
+|---|---|
+| Practice questions | 93, across all six exam formats |
+| Sub-skill coverage | all 31 have at least one question; 18 have only two |
+| Topic notes | 3 of 7 topics written (01, 02, 07) |
+
+The thin spots are real and worth knowing before you clone: a `weak` drill on a sub-skill with two
+questions will start repeating itself. Both numbers grow as `/study-session` runs — it writes new
+questions into the bank as it goes.
+
 ## Exam at a glance
 
 | Item | Value |
