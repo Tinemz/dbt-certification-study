@@ -53,6 +53,20 @@ def as_date(v):
     return None
 
 
+def attempt_order(path):
+    """Chronological sort key for an attempt file.
+
+    Attempt files are named <date>-<mode>[-NN].yml, where the first attempt of
+    a day carries no numeric suffix. A plain filename sort puts "-02" ahead of
+    ".yml" because "-" precedes "." in ASCII, which silently reverses every
+    same-day pair. Parse the suffix into an explicit sequence instead, so the
+    printed trend reads in the order the attempts actually happened.
+    """
+    stem = os.path.basename(path)[:-len(".yml")]
+    tail = stem.rsplit("-", 1)[-1]
+    return (stem[:10], int(tail) if tail.isdigit() else 1, stem)
+
+
 def bar(n, total, width=22):
     filled = 0 if not total else round(width * n / total)
     return "#" * filled + "." * (width - filled)
@@ -117,7 +131,7 @@ def main():
     # ---- attempt history -------------------------------------------------
     print("\n  ATTEMPTS")
     attempts = []
-    for f in sorted(glob.glob(rel("exams/attempts/*.yml"))):
+    for f in sorted(glob.glob(rel("exams/attempts/*.yml")), key=attempt_order):
         attempts.append(yaml.safe_load(open(f)))
     if not attempts:
         print("    none yet -- run a diagnostic to map your gaps")
