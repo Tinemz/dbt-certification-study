@@ -78,7 +78,38 @@ rule that the item terminates as soon as the user endorses a distractor. Ask con
 after the item resolves — not per option.
 
 **The four text formats** — present as before and accept a typed answer, asking for confidence
-alongside it (e.g. `run_results.json / alta`).
+alongside it (`<sua resposta> / alta`).
+
+#### No illustration may carry the answer
+
+Any example that shows the user *how to shape their reply* must be a **structural placeholder**, not
+a filled-in one:
+
+| Format | Use | Never |
+|---|---|---|
+| `matching` | `1-X, 2-X, 3-X` | a real pairing |
+| `build-list` | "a sequência, separada por vírgulas" | a concrete order |
+| `fill-in-blank` | the blank shown in context | a sample value |
+| `hotspot` | "o número da linha" | a number |
+| confidence | `<sua resposta> / alta` | a token from the answer space |
+
+If a format genuinely cannot be illustrated without filling it in, the filled example must be
+**demonstrably wrong for the question on screen**, and must not reuse an option, a sequence element,
+an artifact name or a flag that appears anywhere in the answer. The default is the placeholder — a
+wrong example is the fallback, not the first choice.
+
+This rule covers `answer_note` text echoed from the bank as well. An example that happens to match
+the key silently converts a graded question into a freebie, and the attempt record will not show it.
+
+#### Questions are delivered in English
+
+`stem`, `options`, `code`, `pairs`, `sequence` and `domc_options` reach the user **verbatim in
+English**, exactly as stored in the bank — never translated, never paraphrased.
+
+The surrounding conversation — instructions, feedback, grading, discussion — follows the user's
+language. The PT-BR rule in the team standards governs Jira, commits, branches and PRs; it does not
+reach drill delivery. The exam is in English, and translating at delivery trains a reflex the
+candidate cannot use on exam day.
 
 ## 3. Grade
 
