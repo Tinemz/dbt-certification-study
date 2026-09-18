@@ -53,18 +53,23 @@ def as_date(v):
     return None
 
 
-def attempt_order(path):
+def attempt_order(path, data):
     """Chronological sort key for an attempt file.
 
-    Attempt files are named <date>-<mode>[-NN].yml, where the first attempt of
-    a day carries no numeric suffix. A plain filename sort puts "-02" ahead of
-    ".yml" because "-" precedes "." in ASCII, which silently reverses every
-    same-day pair. Parse the suffix into an explicit sequence instead, so the
-    printed trend reads in the order the attempts actually happened.
+    The filename cannot order a day on its own. It encodes <date>-<mode>[-NN],
+    so the numeric suffix counts within a mode, not within a day: a `weak` run
+    sitting between `drill-02` and `drill-03` carries no suffix at all and
+    collides with the day's first `drill`. Sorting on the name alone therefore
+    falls back to alphabetical order across modes and prints the trend wrong.
+
+    The attempt file states its own position in the day via `seq`. The filename
+    suffix is only a fallback for older records written before that field.
     """
     stem = os.path.basename(path)[:-len(".yml")]
     tail = stem.rsplit("-", 1)[-1]
-    return (stem[:10], int(tail) if tail.isdigit() else 1, stem)
+    fallback = int(tail) if tail.isdigit() else 1
+    data = data or {}
+    return (str(data.get("date", stem[:10])), data.get("seq", fallback), stem)
 
 
 def bar(n, total, width=22):
@@ -130,9 +135,11 @@ def main():
 
     # ---- attempt history -------------------------------------------------
     print("\n  ATTEMPTS")
-    attempts = []
-    for f in sorted(glob.glob(rel("exams/attempts/*.yml")), key=attempt_order):
-        attempts.append(yaml.safe_load(open(f)))
+    loaded = []
+    for f in glob.glob(rel("exams/attempts/*.yml")):
+        loaded.append((f, yaml.safe_load(open(f))))
+    loaded.sort(key=lambda t: attempt_order(*t))
+    attempts = [d for _, d in loaded]
     if not attempts:
         print("    none yet -- run a diagnostic to map your gaps")
     for a in attempts:

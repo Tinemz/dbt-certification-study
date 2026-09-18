@@ -148,6 +148,7 @@ Write `exams/attempts/YYYY-MM-DD-<mode>.yml`:
 ```yaml
 date: 2026-09-15
 mode: quick
+seq: 2                           # position within that date, starting at 1
 partial: false
 score: 11
 total: 15
@@ -161,6 +162,10 @@ answers:
     stated_confidence: alta      # alta | media | chute
     quadrant: misconception      # mastered | misconception | solid | gap | lucky
 ```
+
+`seq` is what orders the day. The filename cannot: its numeric suffix counts within a mode, so a
+`weak` run sitting between `drill-02` and `drill-03` carries no suffix and collides with the day's
+first `drill`. Count every attempt already recorded under today's date and write the next number.
 
 Then update `progress.yml`: increment `seen` and `correct`, set `last_seen` to today, and set
 `confidence`:
