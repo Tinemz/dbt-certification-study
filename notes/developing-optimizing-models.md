@@ -190,56 +190,142 @@ Source: `reference/resource-configs/grants.md`
 
 ## 01-10 — Creating snapshots in YAML
 
-Modern snapshots are defined in YAML under `snapshots/`, with `relation` pointing at the source or
-model to track.
+**What it is.** A table that records how rows of a **mutable** source change over time (Type 2
+SCD). Each `dbt snapshot` run compares the current source with the snapshot table: a changed row
+gets its old version closed (`dbt_valid_to` set) and the new version inserted. First run = a copy
+of the source plus meta fields. History can't be rebuilt — a snapshot is not recreated from source.
 
 ```yaml
+# snapshots/orders_snapshot.yml
 snapshots:
   - name: orders_snapshot
-    relation: source('jaffle_shop', 'orders')
+    relation: source('jaffle_shop', 'orders')   # what to track: source() or ref()
     config:
-      schema: snapshots
-      unique_key: id
-      strategy: timestamp        # timestamp | check
-      updated_at: updated_at     # required for timestamp
-      # check_cols: [status, amount]   # required for check; or 'all'
-      hard_deletes: ignore       # ignore | invalidate | new_record
+      schema: snapshots               # separate schema recommended
+      unique_key: id                  # identifies a record across runs
+      strategy: timestamp             # how change is detected
+      updated_at: updated_at          # required by timestamp
+      # check_cols: [status, amount]  # required by check (or 'all')
+      dbt_valid_to_current: "to_date('9999-12-31')"  # instead of NULL for current rows
+      hard_deletes: ignore            # what to do when a row disappears from the source
 ```
 
-| Strategy | Requires | Detects change via |
-|---|---|---|
-| `timestamp` | `updated_at` | A reliable updated-at column |
-| `check` | `check_cols` | Comparing listed columns (or `all`) |
+| Element | What it is | Where it goes | Rule |
+|---|---|---|---|
+| Snapshot YAML | the `snapshots:` block | `.yml` in `snapshots/`; configs also in `dbt_project.yml` | Legacy `{% snapshot %}` SQL blocks = v1.8 and earlier |
+| `relation` | the source/model being tracked | top level of the snapshot entry | Needs transformation first? → `ref()` an **ephemeral** (or staging) model |
+| `unique_key` | key matching a record between runs | `config:` | **Required**. Column, list, or expression. Must really be unique |
+| `strategy` | how dbt detects that a row changed | `config:` | **Required**. `timestamp` \| `check` (see below) |
+| `updated_at` | last-modified column | `config:` | Required only with `timestamp` |
+| `check_cols` | columns compared for change | `config:` | Required only with `check`; list or `all` |
+| `hard_deletes` | handling of rows deleted in the source | `config:` | `ignore` (default) \| `invalidate` \| `new_record` (see below) |
+| `dbt_valid_to_current` | value of `dbt_valid_to` on current rows | `config:` | Default `NULL` |
+| `snapshot_meta_column_names` | renames the meta fields | `config:` | Dict, e.g. `{dbt_valid_from: start_date}` |
+| `schema` / `database` / `alias` | where the table is built | `config:` | Optional; `schema` goes through `generate_schema_name` |
 
-`timestamp` is preferred when a trustworthy timestamp exists — it is cheaper and catches every
-change. Snapshots implement Type 2 SCD via `dbt_valid_from` / `dbt_valid_to`.
+**`strategy`**
 
-Source: `docs/build/snapshots.md`
+| Value | Requires | Detects change by | Notes |
+|---|---|---|---|
+| `timestamp` (recommended) | `updated_at` | `updated_at` moved forward | One column to track; robust to added/removed source columns |
+| `check` | `check_cols` | Comparing the listed column values | For sources without a reliable timestamp; `check_cols` may need updating as the schema evolves |
+
+**`hard_deletes`**
+
+| Value | Row deleted in source → |
+|---|---|
+| `ignore` (default) | nothing happens |
+| `invalidate` | current row gets `dbt_valid_to` set (replaces legacy `invalidate_hard_deletes=true`) |
+| `new_record` | a new row with `dbt_is_deleted = True` is inserted |
+
+**Meta fields** (added to every row)
+
+| Field | Meaning |
+|---|---|
+| `dbt_valid_from` | when this version became valid |
+| `dbt_valid_to` | when it was invalidated; `NULL` (or `dbt_valid_to_current`) = current |
+| `dbt_scd_id` | unique key per snapshot row (internal) |
+| `dbt_updated_at` | source change timestamp at insertion (internal) |
+| `dbt_is_deleted` | only with `hard_deletes: new_record` |
+
+**Gotchas.**
+- Snapshots **ignore** `--full-refresh` and the `full_refresh` config — history is never dropped.
+- Downstream models read it with `ref('orders_snapshot')`.
+- Useful only if `dbt snapshot` runs on a schedule.
+
+Source: `docs/build/snapshots.md`, `snippets/_snapshot-full-refresh.md` (under `website/`)
 
 ---
 
 ## 01-11 — Selecting the optimal incremental strategy
 
-**When incremental fits.** Large tables where rows are mostly **appended** and rarely updated.
-It is the wrong choice when a large share of the dataset changes every run — there a full `table`
-rebuild is simpler and often cheaper.
+**What it is.** A materialization that, after the first build, transforms only **new or changed**
+rows and writes them into the existing table instead of rebuilding it. First run (or
+`--full-refresh`) = full build. Later runs = the model's SQL filtered by an `is_incremental()`
+block, then written using the **strategy**. Fits large tables where rows are mostly appended and
+rarely updated; wrong when a large share of the data changes every run — a full `table` is simpler.
 
-| Strategy | Behaviour | Fits |
+```sql
+-- models/fct_daily_active_users.sql
+{{
+    config(
+        materialized='incremental',
+        unique_key='date_day',              -- grain; enables update instead of append
+        incremental_strategy='delete+insert',
+        on_schema_change='fail'             -- what to do if columns change
+    )
+}}
+
+select date_trunc('day', event_at) as date_day, count(distinct user_id) as daily_active_users
+from {{ ref('app_data_events') }}
+
+{% if is_incremental() %}                   -- false on first run / --full-refresh
+  where date_day >= (select coalesce(max(date_day), '1900-01-01') from {{ this }})
+{% endif %}                                 -- {{ this }} = the existing target table
+
+group by 1
+```
+
+| Element | What it is | Where it goes | Rule |
+|---|---|---|---|
+| `materialized='incremental'` | turns incremental on | `config()` / YAML `config:` / `dbt_project.yml` | — |
+| `is_incremental()` | macro wrapping the "new rows" filter | model SQL | `true` only if: table exists **and** no `--full-refresh` **and** model is incremental. SQL must be valid either way |
+| `{{ this }}` | the model's existing target table | model SQL, inside the `is_incremental()` block | Used to find the latest loaded timestamp |
+| `unique_key` | column(s) defining the grain | `config` | Optional. Without it → append-only on most adapters. Columns must have no nulls. Prefer a list over `concat()` |
+| `incremental_strategy` | how new rows are written | `config` | See below; support varies by adapter |
+| `on_schema_change` | reaction when the model's columns change | `config` | See below |
+| `merge_update_columns` / `merge_exclude_columns` | limit which columns a `merge` updates | `config` | `merge` only |
+| `incremental_predicates` | extra SQL filters to limit the scan of the target table | `config` (list) | Advanced; syntax not checked; aliases `DBT_INTERNAL_DEST` (target) / `DBT_INTERNAL_SOURCE` (new) |
+| `full_refresh` | force always/never full refresh | `config` | `true`/`false` **overrides** the `--full-refresh` flag |
+| `--full-refresh` | drop and rebuild from scratch | CLI | Use when the model logic changed; `my_model+` refreshes downstream incrementals too |
+
+**`incremental_strategy`**
+
+| Value | Behaviour | Uses `unique_key` | Fits |
+|---|---|---|---|
+| `append` | inserts new rows, no dedup | no | immutable event logs |
+| `merge` | upsert on `unique_key` | yes | records that can update |
+| `delete+insert` | deletes matching keys, reinserts | yes | adapters without efficient merge |
+| `insert_overwrite` | replaces whole partitions | **no** — works on partitions | partitioned warehouses (BigQuery, Spark) |
+| `microbatch` | time-bounded independent batches | adapter-dependent (see 01-14) | large time-series data |
+
+- Not on Postgres/Redshift: `insert_overwrite`. Not on BigQuery: `append`, `delete+insert`.
+- Custom: define macro `get_incremental_<name>_sql`, set `incremental_strategy: <name>`.
+
+**`on_schema_change`**
+
+| Value | Column added to the model | Column removed from the model |
 |---|---|---|
-| `append` | Inserts new rows, no dedup | Immutable event logs |
-| `merge` | Upsert on `unique_key` | Records that can update |
-| `delete+insert` | Deletes matching keys, reinserts | Adapters without efficient merge |
-| `insert_overwrite` | Replaces whole partitions | Partitioned warehouses (BigQuery, Spark) |
-| `microbatch` | Time-bounded independent batches | Large time-series data |
+| `ignore` (default) | **not** added to the table | `dbt run` **fails** |
+| `fail` | error | error |
+| `append_new_columns` | added | kept in the table |
+| `sync_all_columns` | added | removed (includes type changes) |
 
-Support varies by adapter — `insert_overwrite` is not available on Postgres or Redshift, for
-instance. Custom strategies: define a `get_incremental_STRATEGY_sql` macro and set
-`incremental_strategy: STRATEGY`; dbt does not validate the name beyond finding the macro.
+None backfill old rows for new columns → manual update or `--full-refresh`. Top-level columns only
+(nested changes not tracked).
 
-**`is_incremental()`** is true only when the model already exists, is incremental, and the run is
-not `--full-refresh`. It guards the filter that limits the scanned rows.
-
-Source: `docs/build/incremental-models.md`, `docs/build/incremental-strategy.md`
+Source: `docs/build/incremental-models.md`, `docs/build/incremental-strategy.md`,
+`snippets/_incremental-predicates.md` (under `website/`)
 
 ---
 
@@ -253,6 +339,10 @@ Supported on `run`, `build`, `snapshot`, and `compile` (and `seed` from v1.12).
 **Classic exam trap.** Tests still run under `--empty`, but they run against empty tables — so a
 `unique` test passes even when the real source has duplicates. `--empty` does not skip tests and
 does not change how a test works.
+
+The mechanism: a data test returns the rows that **fail**, and passes when it returns none. Against
+a zero-row table every test returns nothing, so every test passes **vacuously**. A green `--empty`
+build proves the SQL compiles and the dependencies resolve; it proves nothing about the data.
 
 Ignored on Python models.
 
@@ -277,20 +367,62 @@ Source: `docs/build/sample-flag.md`
 
 ## 01-14 — Advanced materializations: microbatch
 
-An incremental strategy for **large time-series datasets**. Splits the run into independent,
-idempotent batches — by default one day each — based on `event_time` and `batch_size`.
+**What it is.** An incremental **strategy** for large time-series data. dbt splits the run into
+**batches** — one query per time period (`batch_size`, e.g. one day) — using the model's
+`event_time`. Each batch is independent and idempotent: it can be built, run in parallel, retried,
+or backfilled on its own. You write the SQL for **one batch** with no `is_incremental()` filter;
+dbt filters every upstream that has `event_time` to the batch's window.
 
-**Requirements.**
-- `event_time` on the microbatch model **and on every upstream model you want filtered**.
-- A parent without `event_time` (e.g. a small dimension) is **not** filtered — it gets a full scan
-  on every batch.
-- `event_time` is a time column for range filtering; it is **not** `partition_by`, which groups rows.
+```sql
+-- models/sessions.sql
+{{ config(
+    materialized='incremental',
+    incremental_strategy='microbatch',
+    event_time='session_start',   -- this model's time column
+    begin='2020-01-01',           -- "beginning of time" for first / full builds
+    batch_size='day'              -- one query per day
+) }}
 
-**Why it wins.** Each batch can be built, retried, and backfilled independently, with parallel
-execution — no hand-written conditional backfill logic.
+select ...
+from {{ ref('page_views') }}      -- has event_time → auto-filtered to the batch
+left join {{ ref('customers') }}  -- no event_time → full scan every batch
+  on ...
+```
 
-Under the hood dbt picks the most efficient per-adapter mechanism: `merge` on Postgres,
-`delete+insert` on Redshift and Snowflake, `insert_overwrite` on BigQuery and Spark,
-`replace_where` on Databricks.
+```yaml
+# models/staging/page_views.yml — upstream opts in to filtering
+models:
+  - name: page_views
+    config:
+      event_time: page_view_start
+```
+
+| Element | What it is | Where it goes | Rule |
+|---|---|---|---|
+| `incremental_strategy='microbatch'` | turns microbatch on | model `config` | Requires `materialized='incremental'` |
+| `event_time` | column saying when the row occurred | model **and** each upstream to filter | **Required**. Upstream without it = not filtered. Not `partition_by` (that groups rows) |
+| `begin` | start point for initial / full-refresh builds | model `config` | **Required**. dbt doesn't infer the data's min date |
+| `batch_size` | batch granularity | model `config` | **Required**. `hour` \| `day` \| `month` \| `year` |
+| `lookback` | extra prior batches reprocessed each run (late-arriving rows) | model `config` | Optional, default `1` |
+| `concurrent_batches` | force parallel (`true`) / sequential (`false`) | model `config` | Optional; default = auto-detect |
+| `unique_key` / `partition_by` | adapter-specific extras | model `config` | `unique_key` required on Postgres; `partition_by` required on BigQuery, Spark |
+| `ref('x').render()` | opt one upstream out of auto-filtering | model SQL | Not recommended — full scan per batch |
+| `--event-time-start` / `--event-time-end` | backfill a date range | CLI (`run` / `build`) | Must be passed **together** |
+| `dbt retry` | reruns **only the failed batches** | CLI | — |
+
+**Mechanism per adapter** (dbt picks it; you don't choose)
+
+| Adapter | Runs each batch as |
+|---|---|
+| Postgres | `merge` (hence `unique_key` required) |
+| Redshift, Snowflake | `delete+insert` |
+| BigQuery, Spark | `insert_overwrite` (hence `partition_by` required) |
+| Databricks | `replace_where` |
+
+**Gotchas.**
+- Recommended: `full_refresh: false` on microbatch models. `--full-refresh` alone reloads nothing
+  unless `begin` is set; reprocess history with `--full-refresh --event-time-start … --event-time-end …`.
+- All times (`event_time`, `begin`, the CLI flags) are assumed **UTC**.
+- Not ideal without a reliable `event_time`, or when you need custom incremental logic.
 
 Source: `docs/build/incremental-microbatch.md`, `reference/resource-configs/event-time.md`

@@ -310,3 +310,171 @@
     with nothing to do -- and why --state on dbt retry means "a directory containing
     run_results.json", defaulting to the target directory, rather than a comparison manifest.
   docs_ref: website/docs/reference/commands/retry.md
+
+- id: stt-011
+  topic: "07"
+  subskill: 07-01
+  type: multiple-choice
+  stem: >-
+    A developer runs dbt run --select "model_c" --defer --state prod-artifacts. model_b is an
+    upstream parent of model_c, is not selected, and a stale copy of it already exists in the
+    developer's dev schema from last week. Where does ref('model_b') resolve to?
+  options:
+    a: "Production, because --defer always redirects unselected parents to the state environment"
+    b: "The stale dev copy, because the node exists in the database and --favor-state was not passed"
+    c: "Production, because the dev copy is older than the state manifest"
+    d: "dbt raises an error because a deferred node must not exist in the current target"
+  answer: [b]
+  explanation: >-
+    dbt defers a ref only when BOTH conditions hold: the node is not among the selected nodes, AND
+    it does not exist in the database. Here the second condition fails -- the stale dev copy exists
+    -- so dbt resolves to it. dbt does not compare timestamps. Passing --favor-state would override
+    this and prioritize the state definition.
+  docs_ref: website/docs/reference/node-selection/defer.md
+
+- id: stt-012
+  topic: "07"
+  subskill: 07-01
+  type: fill-in-blank
+  stem: >-
+    Which flag makes dbt prioritize node definitions from the --state directory even when the node
+    already exists in the current target? Type the flag.
+  answer:
+    - "--favor-state"
+    - "favor-state"
+    - "favor_state"
+  answer_note: The leading dashes are optional when grading.
+  explanation: >-
+    --favor-state prioritizes the definitions in the state manifest over what exists in the
+    database. It does not apply to nodes that are themselves part of the selected nodes -- those
+    are always built in the current target.
+  docs_ref: website/docs/reference/node-selection/defer.md
+
+- id: stt-013
+  topic: "07"
+  subskill: 07-01
+  type: matching
+  stem: Match each state selector to the set of nodes it returns.
+  pairs:
+    - left: "state:new"
+      right: Nodes with no matching unique_id in the comparison manifest
+    - left: "state:modified"
+      right: New nodes plus existing nodes whose code changed
+    - left: "state:old"
+      right: Nodes whose unique_id already exists in the comparison manifest
+    - left: "state:unmodified"
+      right: Existing nodes with no changes at all
+  explanation: >-
+    new and old are complements over unique_id presence; modified and unmodified are complements
+    over whether anything changed. The trap is assuming state:modified excludes new nodes -- it
+    includes them. Only state:modified has subselectors.
+  docs_ref: website/docs/reference/node-selection/methods.md
+
+- id: stt-014
+  topic: "07"
+  subskill: 07-01
+  type: multiple-choice
+  stem: >-
+    A 6 MiB seed file is moved from seeds/legacy/rates.csv to seeds/finance/rates.csv. Its contents
+    are byte-for-byte identical. Does state:modified select it?
+  options:
+    a: "Yes -- above 1 MiB dbt compares the file path, and the path changed"
+    b: "No -- the contents are identical, so nothing is modified"
+    c: "No -- dbt skips seeds larger than 1 MiB from state comparison entirely"
+    d: "Yes -- dbt rehashes the file on every run regardless of size"
+  answer: [a]
+  explanation: >-
+    Above 1 MiB dbt cannot compare seed contents and falls back to the file path alone, raising a
+    warning. A path change is therefore the only thing it can detect -- so a move marks the seed
+    modified, while an in-place content edit does not. Below 1 MiB the logic is inverted: dbt stores
+    a file hash and detects content edits.
+  docs_ref: website/docs/reference/node-selection/state-comparison-caveats.md
+
+- id: stt-015
+  topic: "07"
+  subskill: 07-01
+  type: hotspot
+  format_source: inferred
+  stem: >-
+    This CI script should compare the current branch against the production manifest. It reports
+    that every model in the project is modified, on every run. Click the line responsible.
+  code: |
+    dbt deps
+    aws s3 cp s3://artifacts/prod/manifest.json ./prod-artifacts/
+    dbt compile --target ci
+    dbt build --select "state:modified+" --defer --state ./target --target ci
+    dbt source freshness --target ci
+  code_lang: text
+  answer_line: 4
+  explanation: >-
+    --state must point at artifacts from a previous invocation. Line 4 points it at ./target, the
+    directory the dbt compile on line 3 just wrote, so dbt compares the project against itself --
+    which never yields a useful diff and defeats deferral too. The production manifest fetched on
+    line 2 into ./prod-artifacts is what --state should receive.
+  docs_ref: website/docs/reference/node-selection/state-selection.md
+
+- id: stt-016
+  topic: "07"
+  subskill: 07-01
+  type: domc
+  stem: >-
+    A team is auditing which project changes trigger state:modified. For each statement, decide
+    whether it is true on dbt Core 1.11.
+  domc_options:
+    - text: "Changing a model's SQL body marks it modified"
+      keyed: true
+    - text: "Changing a macro marks every model that calls it, directly or indirectly, as modified"
+      keyed: true
+    - text: "Changing a model's configured schema or alias marks it modified"
+      keyed: true
+    - text: "Adding a tag to a model marks it modified"
+      keyed: false
+    - text: "Editing a value under a model's meta key marks it modified"
+      keyed: false
+  explanation: >-
+    tags and meta are metadata and never trigger state:modified, at the resource level or the
+    column level -- this is intentional. Body changes, macro changes at any depth, and relation
+    changes (database, schema, alias) all do. description triggers it only when persist_docs is
+    enabled at that level.
+  docs_ref: website/docs/reference/node-selection/state-comparison-caveats.md
+
+- id: rty-006
+  topic: "07"
+  subskill: 07-02
+  type: multiple-choice
+  stem: >-
+    On dbt Core 1.11, a dbt build --select "tag:nightly" failed partway through. The engineer wants
+    to resume, but only for the finance models. They run dbt retry --select "tag:finance". What
+    happens?
+  options:
+    a: "dbt retries only the finance models that failed"
+    b: "dbt cannot override the prior selection on Core, so the retry resumes the original tag:nightly selection"
+    c: "dbt merges both selectors and retries the intersection"
+    d: "dbt errors because --select is not a valid flag for retry"
+  answer: [b]
+  explanation: >-
+    dbt retry reuses the prior command's selection, including --select, --exclude and --selector,
+    and you cannot override them on dbt Core or the dbt platform CLI. Narrowing the retry scope with
+    new selectors is a Fusion / v2.0 capability, not 1.11. What retry does let you override are
+    runtime options such as --threads, --vars, --target and --full-refresh.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: rty-007
+  topic: "07"
+  subskill: 07-02
+  type: fill-in-blank
+  stem: >-
+    A dbt run completes with no errors. The engineer immediately runs dbt retry. dbt reports that it
+    finished as a ____ . Fill in the blank with the term the docs use.
+  answer:
+    - "no operation"
+    - "no-operation"
+    - "no op"
+    - "no-op"
+    - "noop"
+  explanation: >-
+    If the previously executed command completed successfully, retry finishes as no operation and
+    prints "Nothing to do." Retry is driven by run_results.json; with no failure recorded there is
+    no point of failure to resume from. This is different from the case where the run failed before
+    any node executed -- there retry also does nothing, but because no nodes were recorded at all.
+  docs_ref: website/docs/reference/commands/retry.md

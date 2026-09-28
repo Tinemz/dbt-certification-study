@@ -637,3 +637,131 @@
     microbatch uses to bound each batch; partition_by is a platform storage concern that groups rows
     into partitions. Setting one does not imply the other.
   docs_ref: website/docs/docs/build/incremental-microbatch.md
+
+- id: emp-004
+  topic: "01"
+  subskill: 01-12
+  type: multiple-choice
+  stem: >-
+    A CI job runs dbt build --empty on every pull request. One PR introduces a model whose join
+    duplicates rows, yet the job passes green, including the unique test on the primary key. Why?
+  options:
+    a: "--empty skips data tests, so the unique test never executed"
+    b: "Data tests return the rows that fail, and against zero-row inputs they return none, so every test passes vacuously"
+    c: "--empty downgrades every test to severity warn, so failures do not break the build"
+    d: "The unique test was deferred to production, where the duplicate does not exist yet"
+  answer: [b]
+  explanation: >-
+    --empty limits refs and sources to zero rows but still runs the SQL and still runs the tests.
+    A data test passes when it returns no failing rows, and an empty input can never produce one,
+    so the whole suite passes without examining a single real record. The flag changes the input
+    volume, not the tests or their severity.
+  docs_ref: website/docs/docs/build/empty-flag.md
+
+- id: emp-005
+  topic: "01"
+  subskill: 01-12
+  type: domc
+  stem: >-
+    A team is deciding where --empty belongs in their workflow. Decide whether each statement is
+    true for dbt 1.11.
+  domc_options:
+    - text: "A green --empty build confirms that refs resolve and column names are valid"
+      keyed: true
+    - text: "The flag is ignored when applied to a Python model"
+      keyed: true
+    - text: "dbt still executes the model SQL against the target warehouse"
+      keyed: true
+    - text: "A green --empty build confirms the model's output data is correct"
+      keyed: false
+    - text: "The flag compiles the SQL locally without touching the warehouse"
+      keyed: false
+  explanation: >-
+    The flag exists to validate structure cheaply: the SQL really runs against the warehouse, which
+    is what proves dependencies and column names, but the inputs are capped at zero rows so nothing
+    is learned about the data. Compiling without a warehouse round trip is what dbt compile does,
+    not --empty.
+  docs_ref: website/docs/docs/build/empty-flag.md
+
+- id: emp-006
+  topic: "01"
+  subskill: 01-12
+  type: multiple-choice
+  code: |
+    $ dbt build --empty --select "state:modified+" --state prod_artifacts
+    ...
+    Done. PASS=48 WARN=0 ERROR=0 SKIP=0 TOTAL=48
+  code_lang: text
+  stem: >-
+    A nightly job runs the command above and promotes to production whenever dbt exits 0. Last
+    night it produced the output shown, yet a duplicate primary key reached production. Which
+    statement explains the gap?
+  options:
+    a: "The tests were skipped, because --empty excludes test nodes from the selection"
+    b: "The tests ran against zero-row inputs and passed vacuously, so PASS=48 says nothing about the data"
+    c: "state:modified+ excluded the model containing the bug from the run"
+    d: "dbt exited 0 despite errors, because --empty suppresses non-zero exit codes"
+  answer: [b]
+  explanation: >-
+    PASS=48 is real -- 48 nodes did run and did pass. But --empty caps refs and sources at zero
+    rows, and a data test passes when it returns no failing rows, so an empty input guarantees a
+    pass. The exit code is a valid signal about whether the build completed; it is not evidence
+    about the data, and gating a promotion on it ships unverified rows.
+  docs_ref: website/docs/docs/build/empty-flag.md
+
+- id: emp-007
+  topic: "01"
+  subskill: 01-12
+  type: build-list
+  stem: >-
+    An analytics engineer is validating a large new model before committing. Put the steps in the
+    order that catches problems earliest and at the lowest warehouse cost.
+  sequence:
+    - "Run dbt compile to confirm the Jinja renders and the SQL is syntactically valid"
+    - "Run dbt build --empty to confirm refs resolve and column names exist, at zero read cost"
+    - "Run dbt build --sample to exercise the logic against a recent slice of real rows"
+    - "Run the full dbt build so the data tests evaluate the complete dataset"
+  explanation: >-
+    Each step costs more than the previous one and catches a different class of problem: rendering,
+    then structure, then behaviour against real rows, then the data itself. Only the last step can
+    fail a unique or not_null test on genuine duplicates, because the earlier ones either skip the
+    warehouse or starve the tests of rows.
+  docs_ref: website/docs/docs/build/empty-flag.md
+
+- id: smp-003
+  topic: "01"
+  subskill: 01-13
+  type: matching
+  stem: >-
+    Match each development invocation to what a successful run of it actually proves.
+  pairs:
+    - left: "dbt build --empty"
+      right: "The SQL executes and dependencies resolve; nothing about the data"
+    - left: "dbt build --sample=\"3 days\""
+      right: "The logic behaves against a recent slice of real rows, though joins may be incomplete"
+    - left: "dbt build --full-refresh"
+      right: "The incremental model rebuilds correctly from scratch, ignoring existing rows"
+    - left: "dbt build"
+      right: "The full dataset passes every data test that was configured"
+  explanation: >-
+    The three flags trade cost against evidence. --empty buys structural validation for almost
+    nothing, --sample buys real but partial behaviour, --full-refresh exercises the rebuild path,
+    and only an unflagged build lets the tests see every row. Sample mode requires event_time on
+    the refs you want filtered, and the docs warn that not all joins will necessarily be populated.
+  docs_ref: website/docs/docs/build/sample-flag.md
+
+- id: mb-004
+  topic: "01"
+  subskill: 01-14
+  type: fill-in-blank
+  stem: >-
+    Sample mode and the microbatch strategy both filter rows by time, and both read the same model
+    config to know which column carries the timestamp. Name that config exactly as it appears in
+    YAML.
+  answer: ["event_time"]
+  answer_note: case-insensitive; trailing colon ignored
+  explanation: >-
+    event_time is the single config both features key on. Sample mode filters refs and sources by
+    it to build a time-bounded slice, and microbatch uses it to split a model into time-bounded
+    batches. Without it configured, sample mode has nothing to filter on.
+  docs_ref: website/docs/docs/build/incremental-microbatch.md

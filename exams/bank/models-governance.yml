@@ -341,3 +341,164 @@
     spanning more than one column belongs at the model level, where the columns: list names the
     columns it applies to. Single-column constraints are still recommended directly on the column.
   docs_ref: website/docs/reference/resource-properties/constraints.md
+
+- id: ver-008
+  topic: "02"
+  subskill: 02-02
+  type: build-list
+  stem: >-
+    A producer team must drop a column from a contracted model that several consumer teams query.
+    Put the five steps in the order the docs prescribe, from first to last.
+  sequence:
+    - "Develop the new version alongside the existing one"
+    - "Bump latest_version so unpinned ref() calls resolve to the new version"
+    - "Set a deprecation_date on the old version to open the migration window"
+    - "Update downstream references to the new version"
+    - "Remove the old version once the deprecation date has passed"
+  explanation: >-
+    The docs state the pathway in one sentence: develop a new version, bump the latest, slate the
+    old version for deprecation, update downstream references, and then remove the old version. The
+    common error is updating downstream references before bumping latest_version and announcing the
+    deprecation -- consumers cannot plan a migration that has not been announced, and the new
+    version is not yet canonical for unpinned refs. Note what step 4 actually covers: unpinned
+    ref('dim_customers') calls follow latest_version automatically and need no edit. The references
+    that must be migrated by hand are the pinned ones -- ref('dim_customers', v=1), which consumers
+    adopt precisely to survive the migration window -- plus cross-project refs and anything querying
+    the _v1 relation outside dbt. Those pins are what blocks step 5.
+  docs_ref: website/docs/docs/mesh/govern/model-versions.md
+
+- id: ver-009
+  topic: "02"
+  subskill: 02-02
+  type: multiple-choice
+  stem: >-
+    A model declares versions v1, v2 and v3, and sets latest_version: 1. How is each version
+    classified, and what does an unpinned ref('dim_customers') return?
+  options:
+    a: "v1 old, v2 and v3 latest; the ref returns v3"
+    b: "v1 is latest, v2 and v3 are prerelease; the ref returns v1"
+    c: "v3 is latest, v1 and v2 are old; the ref returns v3"
+    d: "v1 is latest, v2 and v3 are old; the ref returns v1"
+  answer: [b]
+  explanation: >-
+    Versions above latest_version are prerelease; versions below it are old. With latest_version
+    explicitly set to 1, both v2 and v3 sit above it and are prerelease, and the unpinned ref
+    resolves to latest_version -- v1. The greatest identifier wins only when latest_version is not
+    declared at all. This is the documented "v2 in early development and testing" scenario.
+  docs_ref: website/docs/reference/resource-properties/latest_version.md
+
+- id: ver-010
+  topic: "02"
+  subskill: 02-02
+  type: fill-in-blank
+  stem: >-
+    A deprecation_date on dim_customers_v1 passed last month, but the relation is still being
+    rebuilt in the warehouse every night and the team wants it to stop. Which model config do they
+    set to make dbt stop building it? Type the config key.
+  answer:
+    - "enabled"
+    - "enabled: false"
+    - "config.enabled"
+  answer_note: The value (false) is optional when grading; the key is what is being tested.
+  explanation: >-
+    A deprecation_date is a communication mechanism, not an action. dbt warns about the deprecated
+    model but keeps building it and never drops its relation. Stopping the build takes enabled:
+    false, or deleting the version from the project.
+  docs_ref: website/docs/reference/resource-properties/deprecation_date.md
+
+- id: ver-011
+  topic: "02"
+  subskill: 02-02
+  type: domc
+  stem: >-
+    A team is deciding how to ship a change to a contracted, widely-queried model. For each
+    statement, decide whether it is true on dbt Core 1.11.
+  domc_options:
+    - text: "Adding a new nullable column is a non-breaking change and does not require a new version"
+      keyed: true
+    - text: "Removing a column or changing its data type is a breaking change that warrants a new version"
+      keyed: true
+    - text: "Several versions of the same model can exist in the warehouse at the same time"
+      keyed: true
+    - text: "Creating a new version automatically drops the previous version's relation"
+      keyed: false
+    - text: "A model must declare versions before it can carry a deprecation_date"
+      keyed: false
+  explanation: >-
+    Versioning exists for breaking changes -- removing or renaming a column, changing a data type or
+    nullability. Non-breaking additions should be preferred and shipped in place. Multiple versions
+    are materialized concurrently, which is the trade-off the docs call out explicitly, and nothing
+    is dropped automatically. deprecation_date works with or without versions.
+  docs_ref: website/docs/docs/mesh/govern/model-versions.md
+
+- id: ver-012
+  topic: "02"
+  subskill: 02-02
+  type: multiple-choice
+  stem: >-
+    A BI tool queries the table name dim_customers directly, outside dbt, and must always land on
+    the current latest version. The project runs dbt Core 1.11. What is the documented approach?
+  options:
+    a: "Enable the latest_version_pointer config on the model"
+    b: "A macro guarded on model.version == model.latest_version, invoked from an on-run-end hook to create the view"
+    c: "Set alias: dim_customers on the latest version so it drops the _v suffix"
+    d: "Nothing is needed -- dbt always creates an unsuffixed view alongside the versioned relations"
+  answer: [b]
+  explanation: >-
+    latest_version_pointer is a 1.12+ config and is not available on 1.11. On 1.11 the docs show the
+    do-it-yourself pattern: a macro that checks whether the model being built is the latest version
+    and creates a view under the base name, called from an on-run-end hook. Versioned relations are
+    aliased <model>_v<v> by default and dbt creates no unsuffixed view on its own.
+  docs_ref: website/docs/docs/mesh/govern/model-versions.md
+
+- id: ver-013
+  topic: "02"
+  subskill: 02-02
+  type: matching
+  stem: Match each deprecation warning to the situation that raises it.
+  pairs:
+    - left: DeprecatedModel
+      right: Parsing a project that defines a model with a deprecation_date
+    - left: DeprecatedReference
+      right: Referencing a model whose deprecation_date has already passed
+    - left: UpcomingReferenceDeprecation
+      right: Referencing a model whose deprecation_date is still in the future
+    - left: WARN_ERROR_OPTIONS
+      right: Promoting any of these warnings into a runtime error
+  explanation: >-
+    The producer sees DeprecatedModel at parse time merely for defining the date. The two Reference
+    warnings fire for consumers and producers alike, split by whether the date has passed. None of
+    them fail the run on their own -- WARN_ERROR_OPTIONS is what turns a warning into an error.
+  docs_ref: website/docs/reference/resource-properties/deprecation_date.md
+
+- id: ver-014
+  topic: "02"
+  subskill: 02-02
+  type: hotspot
+  format_source: inferred
+  stem: >-
+    This YAML is meant to declare v1 of dim_customers with every top-level column except
+    country_name. dbt raises an error on parse. Click the line responsible.
+  code: |
+    models:
+      - name: dim_customers
+        latest_version: 2
+        columns:
+          - name: customer_id
+            data_type: int
+          - name: country_name
+            data_type: varchar
+        versions:
+          - v: 2
+          - v: 1
+            columns:
+              - include: [customer_id]
+                exclude: [country_name]
+  code_lang: yaml
+  answer_line: 13
+  explanation: >-
+    exclude is only valid when include is '*' or 'all' -- the default. Line 13 names an explicit
+    include list, so the exclude on the following line has nothing to subtract from and dbt errors.
+    Either use include '*' with exclude [country_name], or list the wanted columns in include and
+    drop exclude entirely.
+  docs_ref: website/docs/reference/resource-properties/versions.md

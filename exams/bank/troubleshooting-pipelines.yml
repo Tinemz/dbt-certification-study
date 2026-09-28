@@ -100,12 +100,15 @@
       keyed: true
     - text: "dbt retry rebuilds every node in the project to guarantee consistency"
       keyed: false
-    - text: "Nodes on branches unrelated to the failure are skipped as a precaution"
+    - text: "During that build, nodes on branches unrelated to the failure are skipped as a precaution"
       keyed: false
   explanation: >-
     Retry resumes rather than restarts, skips propagate only downstream, and --fail-fast changes
-    when the run halts. Unrelated branches keep building, which is why a partial run can leave the
-    warehouse in a mixed state worth checking before retrying.
+    when the run halts. During the failed build, unrelated branches keep building, which is why a
+    partial run can leave the warehouse in a mixed state worth checking before retrying. SKIP is a
+    status reserved for nodes blocked by a failed parent -- in the retry invocation the
+    already-successful nodes are not skipped either, they are simply outside the resumed set, which
+    is why the docs' retry output reports SKIP=0.
   docs_ref: website/docs/reference/commands/retry.md
 
 - id: cln-002
@@ -146,3 +149,138 @@
     individual clone statements do not depend on one another, raising --threads is the documented
     way to speed up a large clone.
   docs_ref: website/docs/reference/commands/clone.md
+
+- id: dag-105
+  topic: "04"
+  subskill: 04-01
+  type: matching
+  stem: >-
+    Match each recovery selector or flag to what it actually selects or does after a failed
+    dbt build.
+  pairs:
+    - left: "result:error"
+      right: "Any resource type -- model, seed, snapshot or test -- that returned an error"
+    - left: "result:fail"
+      right: "Test nodes only, and only those that returned a fail verdict"
+    - left: "1+result:fail"
+      right: "The failed tests plus the models immediately upstream of them"
+    - left: "source_status:fresher+"
+      right: "Sources whose freshness improved since sources.json, and their descendants"
+    - left: "--fail-fast"
+      right: "Halts the invocation at the first failure, cancelling in-flight queries"
+  explanation: >-
+    result:error spans models, seeds, snapshots and tests, while result:fail is a test-only verdict.
+    Because tests sit at the end of a branch, result:fail+ adds nothing, so 1+ is what reaches the
+    model that produced the failure. source_status: reads sources.json from dbt source freshness,
+    not run_results.json. --fail-fast is not a selector at all -- it changes when the run stops.
+  docs_ref: website/docs/reference/node-selection/configure-state.md
+
+- id: dag-106
+  topic: "04"
+  subskill: 04-01
+  type: build-list
+  stem: >-
+    A nightly dbt build failed on a single model due to a bad column reference. Put the recovery
+    steps in the order that avoids rebuilding any already-successful node.
+  sequence:
+    - "Read run_results.json to identify the failed node and the nodes marked SKIP"
+    - "Fix the SQL in the failing model"
+    - "Run dbt retry, which resumes the invocation from the point of failure"
+    - "Confirm the previously skipped downstream nodes completed in the retry output"
+  explanation: >-
+    run_results.json is the artifact that records both the error and the skips, and it is the same
+    file dbt retry reads to decide where to resume. Retrying before fixing the error is idempotent
+    and fails at the same node again.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: dag-107
+  topic: "04"
+  subskill: 04-01
+  type: multiple-choice
+  code: |
+    models:
+      - name: stg_payments
+        columns:
+          - name: payment_id
+            tests:
+              - unique:
+                  severity: warn
+              - not_null
+  code_lang: yaml
+  stem: >-
+    During dbt build, the unique test on payment_id returns 12 failing rows and the not_null test
+    passes. fct_revenue depends on stg_payments. What happens to fct_revenue?
+  options:
+    a: "It is skipped, because any nonzero test failure blocks downstream resources"
+    b: "It builds, because a test configured with severity warn does not block downstream resources"
+    c: "It is skipped, because severity warn still counts as a failure for build ordering"
+    d: "It errors, because dbt promotes warnings to errors inside dbt build"
+  answer: [b]
+  explanation: >-
+    Only a test that errors blocks and skips downstream resources. severity warn keeps the test
+    result at warning level, so the DAG continues. Promotion to an error happens only if the run
+    also passes --warn-error or --warn-error-options.
+  docs_ref: website/docs/reference/commands/build.md
+
+- id: dag-108
+  topic: "04"
+  subskill: 04-01
+  type: fill-in-blank
+  stem: >-
+    A dbt build failed. You want to rerun only the tests that failed, plus their immediate parent
+    models and everything downstream of those models. Complete the selector value passed to
+    --select (the --state flag is already supplied).
+  answer: ["1+result:fail+", "\"1+result:fail+\"", "'1+result:fail+'"]
+  answer_note: case-insensitive; surrounding quotes ignored
+  explanation: >-
+    1+ reaches one level upstream to the models that produced the failed tests, and the trailing +
+    adds all descendants. result:fail+ alone expands to nothing extra, because test nodes have no
+    children in the DAG.
+  docs_ref: website/docs/reference/node-selection/methods.md
+
+- id: dag-109
+  topic: "04"
+  subskill: 04-01
+  type: domc
+  stem: >-
+    A scheduled dbt build died immediately with a warehouse permission error, before any node
+    executed. Decide whether each statement about the recovery is true.
+  domc_options:
+    - text: "dbt retry will have nothing to resume, because no nodes were recorded as executed"
+      keyed: true
+    - text: "Checking run_results.json and re-running the full job is the recommended path here"
+      keyed: true
+    - text: "dbt debug can be used to verify the connection and profile before re-running"
+      keyed: true
+    - text: "dbt retry will rebuild the project from the beginning since the run has no progress"
+      keyed: false
+    - text: "Passing --fail-fast to the next run will let it resume past the permission error"
+      keyed: false
+  explanation: >-
+    Retry resumes from recorded nodes, so a failure that predates any execution leaves it with
+    nothing to do -- the docs point to run_results.json and a manual full re-run. dbt debug is the
+    right diagnostic for connection and profile problems, and --fail-fast only controls when a run
+    stops, never whether it resumes.
+  docs_ref: website/docs/reference/commands/retry.md
+
+- id: dag-110
+  topic: "04"
+  subskill: 04-01
+  type: hotspot
+  format_source: inferred
+  code: |
+    # recovery runbook, dbt Core 1.11
+    dbt build --select "result:error+" --state prod_artifacts
+    dbt source freshness
+    dbt build --select "source_status:fresher+" --state prod_artifacts
+    dbt retry --select "fct_orders+"
+    dbt debug --connection
+  code_lang: text
+  stem: >-
+    One line in this runbook cannot work on dbt Core 1.11. Click the offending line.
+  answer_line: 5
+  explanation: >-
+    On dbt Core, dbt retry reuses the prior invocation's selection and cannot be given --select,
+    --exclude or --selector. Narrowing the retry scope that way is a Fusion v2.0 capability. Every
+    other line is valid 1.11 syntax.
+  docs_ref: website/docs/reference/commands/retry.md

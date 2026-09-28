@@ -137,3 +137,137 @@
     the exit code; acting on that signal is the orchestrator's job, since dbt never refreshes source
     data itself.
   docs_ref: website/docs/reference/commands/source.md
+
+- id: exp-004
+  topic: "06"
+  subskill: 06-01
+  type: matching
+  stem: >-
+    Match each exposure property to the rule that governs it.
+  pairs:
+    - left: "name"
+      right: "Required; letters, numbers and underscores only"
+    - left: "owner"
+      right: "Required; at least one of name or email must be present"
+    - left: "depends_on"
+      right: "Expected rather than required; lists ref, source and metric nodes"
+    - left: "label"
+      right: "Optional; the property that may carry spaces and capital letters"
+    - left: "maturity"
+      right: "Optional; one of high, medium or low"
+  explanation: >-
+    The three required properties are name, type and owner. depends_on sits in the docs' expected
+    tier, not the required one, which is why an exposure with no parents still parses. owner is
+    satisfied by name or email alone. label exists precisely because name rejects spaces and
+    special characters.
+  docs_ref: website/docs/docs/build/exposures.md
+
+- id: exp-005
+  topic: "06"
+  subskill: 06-01
+  type: multiple-choice
+  code: |
+    exposures:
+      - name: weekly_kpis
+        type: dashboard
+        maturity: high
+        url: https://bi.tool/dashboards/7
+        depends_on:
+          - ref('fct_orders')
+  code_lang: yaml
+  stem: >-
+    This exposure definition fails to parse. What is missing?
+  options:
+    a: "A description, which becomes mandatory once maturity is set"
+    b: "The owner property, which is required and needs at least a name or an email"
+    c: "A label, which url requires in order to render the docs-site link"
+    d: "A second entry in depends_on, since an exposure must have more than one parent"
+  answer: [b]
+  explanation: >-
+    name, type and owner are the three required properties, and this definition supplies only the
+    first two. maturity, url, label and description are all optional, and depends_on has no minimum
+    length -- it is not even in the required tier.
+  docs_ref: website/docs/reference/exposure-properties.md
+
+- id: exp-006
+  topic: "06"
+  subskill: 06-01
+  type: domc
+  stem: >-
+    A team has just added exposures to their project. Decide whether each statement is true.
+  domc_options:
+    - text: "dbt run --select \"+exposure:weekly_kpis\" builds the resources that feed that exposure"
+      keyed: true
+    - text: "An exposure is a metadata node and is never materialized in the warehouse"
+      keyed: true
+    - text: "The exposure method needs the + operator to be useful, since it selects parents"
+      keyed: true
+    - text: "dbt build materializes exposures as views so BI tools can query them directly"
+      keyed: false
+    - text: "Setting url on an exposure creates the dashboard in the connected BI tool"
+      keyed: false
+  explanation: >-
+    Exposures describe a downstream consumer; they carry no SQL and produce no relation. The
+    exposure: selection method resolves to the exposure node itself, so the + prefix is what
+    reaches the upstream resources that actually build. url only activates the View this exposure
+    link on the generated docs site.
+  docs_ref: website/docs/docs/build/exposures.md
+
+- id: frs-004
+  topic: "06"
+  subskill: 06-02
+  type: hotspot
+  format_source: inferred
+  code: |
+    sources:
+      - name: jaffle_shop
+        config:
+          freshness:
+            warn_after: {count: 12, period: hour}
+            error_after: {count: 2, period: week}
+          loaded_at_field: _etl_loaded_at
+        tables:
+          - name: orders
+  code_lang: yaml
+  stem: >-
+    One line in this source definition uses a value dbt does not accept. Identify that line.
+  answer_line: 6
+  explanation: >-
+    period accepts minute, hour or day only -- week is not a valid period. The threshold would have
+    to be expressed as {count: 14, period: day}. Everything else here is valid for dbt 1.11, where
+    freshness sits under config (since v1.9) and loaded_at_field sits under config (since v1.10).
+  docs_ref: website/docs/reference/resource-properties/freshness.md
+
+- id: frs-005
+  topic: "06"
+  subskill: 06-02
+  type: fill-in-blank
+  stem: >-
+    A source-level freshness block applies to every table in the source, but one table must be left
+    out of freshness checks entirely. Write the complete config line that excludes it, as it appears
+    nested under that table's config key.
+  answer: ["freshness: null", "freshness:null"]
+  answer_note: case-insensitive; leading dash and surrounding quotes ignored
+  explanation: >-
+    The documented way to exclude a source or table is to set freshness explicitly to null at the
+    level you want excluded. Omitting the block does not work, because the source-level block is
+    inherited by every table beneath it.
+  docs_ref: website/docs/reference/resource-properties/freshness.md
+
+- id: frs-006
+  topic: "06"
+  subskill: 06-02
+  type: build-list
+  stem: >-
+    Put the steps of a freshness-gated pipeline in the order dbt requires.
+  sequence:
+    - "Declare a freshness block with warn_after, error_after, or both on the source"
+    - "Run dbt source freshness, which writes the current sources.json to the target directory"
+    - "Check the exit code -- a stale source makes dbt exit nonzero"
+    - "Run dbt build with source_status:fresher+ and --state pointing at the prior artifacts"
+  explanation: >-
+    A freshness block with neither warn_after nor error_after is not evaluated at all, so the
+    declaration has to come first. source_status: compares the current sources.json against the one
+    in --state, which means dbt source freshness must have run in this invocation to produce
+    something to compare.
+  docs_ref: website/docs/reference/commands/source.md

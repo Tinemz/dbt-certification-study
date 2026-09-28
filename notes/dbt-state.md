@@ -37,14 +37,16 @@ Source: `reference/artifacts/dbt-artifacts.md`, `reference/node-selection/config
 dbt run --select "state:modified+" --defer --state path/to/artifacts
 ```
 
-| Flag | Env var (**1.11+**) | Env var (≤1.10) | Type |
-|---|---|---|---|
-| `--state` | `DBT_ENGINE_STATE` | `DBT_STATE` | path |
-| `--defer` | `DBT_ENGINE_DEFER` | `DBT_DEFER` | boolean |
-| `--defer-state` | `DBT_ENGINE_DEFER_STATE` | `DBT_DEFER_STATE` | path (optional) |
+| Flag | What it is | Env var (**1.11+**) | Env var (≤1.10) | Type |
+|---|---|---|---|---|
+| `--state` | directory of a **previous** invocation's artifacts to compare against | `DBT_ENGINE_STATE` | `DBT_STATE` | path |
+| `--defer` | resolve unselected, unbuilt upstream `ref()`s to the state environment | `DBT_ENGINE_DEFER` | `DBT_DEFER` | boolean |
+| `--defer-state` | separate artifacts dir used only for deferral | `DBT_ENGINE_DEFER_STATE` | `DBT_DEFER_STATE` | path (optional) |
+| `--favor-state` | prefer the state definition even when the node exists in the dev database (not if selected) | `DBT_ENGINE_FAVOR_STATE` | `DBT_FAVOR_STATE` | boolean, default `False` |
 
 - Flag beats env var when both are set.
-- `--defer-state` unset → deferral falls back to `--state`.
+- `--defer-state` unset → deferral falls back to `--state`. Splitting them lets you compare
+  **logical** state against one environment while **failing over** to another for unbuilt nodes.
 - Deferral requires **both** `--defer` and `--state`.
 - `--state` artifacts must be schema-compatible with the running dbt version.
 - Old syntax `DBT_ARTIFACT_STATE_PATH` / `DBT_DEFER_TO_STATE` deprecated in v1.5.
@@ -137,7 +139,8 @@ Source: `reference/commands/clone.md`
 
 - **`tags` and `meta` never trigger `state:modified`** — metadata only, resource level *and* column
   level. Intentional. `description` does, but only under `persist_docs`.
-- **Seeds**: <1 MiB compared by file hash; ≥1 MiB compared by **file path only**, with a warning.
+- **Seeds**: `<1 MiB` compared by **file hash** (content edits detected); `>1 MiB` compared by
+  **file path only**, with a warning (content edits invisible; a rename/move *is* detected).
 - **Macros**: anything depending on a changed macro, at any depth, is marked modified.
 - **Vars / env vars**: dbt cannot trace the lineage, so a changed `var` does not by itself mark a
   model modified — only if it lands in a different config.
@@ -169,8 +172,12 @@ dbt retry --state path/to/previous/run   # defaults to the target directory
 **Supported commands:** `build`, `compile`, `clone`, `docs generate`, `seed`, `snapshot`, `test`,
 `run`, `run-operation`.
 
-**Core flags (1.11):** `--threads`, `--vars`, `--target`, `--profile`, `--profiles-dir`,
-`--project-dir`, `--target-path`, `--state`, `--full-refresh`.
+**What retry lets you override (Core 1.11):** `--threads`, `--vars`, `--target`, `--profile`,
+`--profiles-dir`, `--project-dir`, `--target-path`, `--state`, `--full-refresh`.
+
+**What it does not:** `--select`, `--exclude`, `--selector`. Retry inherits the prior command's
+selection and you cannot narrow it on Core or the dbt platform CLI. Overriding selectors on retry
+is a **Fusion / v2.0** feature.
 
 ### Exam angles
 
@@ -191,7 +198,9 @@ dbt retry --state path/to/previous/run   # defaults to the target directory
 
 - Retry is driven by `run_results.json`, so any command that does not produce one gives it nothing
   to work from.
-- Skipped downstream nodes from the failed run are part of what retry picks back up — the count in
-  the final `Done.` line reflects the whole original run, not just the retried nodes.
+- Skipped downstream nodes from the failed run are part of what retry picks back up.
+- The final `Done.` line is **not** a reliable signal of what retry did: in the docs' examples a
+  *failed* retry reports the whole original run (`PASS=4 ... TOTAL=5`) while a *successful* retry
+  reports only the retried nodes (`PASS=1 ... TOTAL=1`).
 
 Source: `reference/commands/retry.md`

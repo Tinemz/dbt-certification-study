@@ -157,3 +157,191 @@
     because they validate logic rather than data. A failing data test causes its downstream models
     to be skipped, which is the mechanism that stops bad data propagating.
   docs_ref: website/docs/reference/commands/build.md
+
+- id: tst-009
+  topic: "05"
+  subskill: 05-01
+  type: multiple-choice
+  code: |
+    unit_tests:
+      - name: test_customer_flags
+        model: dim_customers
+        given:
+          - input: ref('int_customer_base')   # ephemeral model
+            format: dict
+            rows:
+              - {customer_id: 1, is_active: true}
+        expect:
+          rows:
+            - {customer_id: 1, active_flag: 'Y'}
+  code_lang: yaml
+  stem: >-
+    int_customer_base is materialized as ephemeral. What must change for this unit test to work?
+  options:
+    a: "Nothing; dict is the default format and works for any input"
+    b: "Switch the input to format: sql and supply every column of int_customer_base"
+    c: "Switch the input to format: csv and move the rows to tests/fixtures/"
+    d: "Remove the input, since ephemeral models are inlined and need no mock"
+  answer: [b]
+  explanation: >-
+    An input that is an ephemeral model must use format: sql. With format: sql, mock data must be
+    supplied for all columns, unlike dict and csv, which accept only the relevant columns. Removing
+    the input breaks the rule that every ref in the model must be declared as an input.
+  docs_ref: website/docs/docs/build/unit-tests.md
+
+- id: tst-010
+  topic: "05"
+  subskill: 05-01
+  type: hotspot
+  format_source: inferred
+  code: |
+    models:
+      - name: fct_payments
+        columns:
+          - name: payment_id
+            data_tests:
+              - unique
+              - not_null
+          - name: amount
+            data_tests:
+              - assert_total_payment_amount_is_positive
+          - name: status
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['paid', 'refunded']
+  code_lang: yaml
+  stem: >-
+    The project has a singular test at tests/assert_total_payment_amount_is_positive.sql. dbt raises
+    an error when parsing this YAML. Click the line responsible.
+  answer_line: 10
+  explanation: >-
+    Singular tests run automatically on dbt test and must not be referenced in a model's YAML. They
+    are not generic tests or macros, so listing one under data_tests raises an error. The
+    accepted_values block is valid: its values are nested under arguments, as required from
+    v1.10.5.
+  docs_ref: website/docs/docs/build/data-tests.md
+
+- id: tst-011
+  topic: "05"
+  subskill: 05-01
+  type: fill-in-blank
+  stem: >-
+    A custom generic test is applied to a column of a source. Inside the test block, what is the
+    name of the standard argument that receives the source's relation? Type the argument name.
+  answer: ["model"]
+  answer_note: case-insensitive
+  explanation: >-
+    The standard argument is always named model, even when the resource is a source, seed, or
+    snapshot. The other standard argument is column_name. Both come from the YAML context and are
+    not passed explicitly.
+  docs_ref: website/docs/best-practices/custom-generic-tests.md
+
+- id: tst-012
+  topic: "05"
+  subskill: 05-01
+  type: domc
+  stem: >-
+    For each statement about defining unit tests in dbt Core 1.11, decide whether it is true.
+  domc_options:
+    - text: "Every ref and source the model uses should be declared as a given input"
+      keyed: true
+    - text: "If a seed input is omitted, the seed itself is used as the input"
+      keyed: true
+    - text: "An override of a macro applies even if the model only calls it indirectly, through another macro"
+      keyed: false
+    - text: "Unit test YAML definitions belong in the tests/ directory, next to singular tests"
+      keyed: false
+    - text: "With format: sql, you can mock only the columns relevant to the test"
+      keyed: false
+  explanation: >-
+    Undeclared refs or sources cause "node not found" at compile, and an omitted seed falls back to
+    the seed itself. Overrides apply only to macros, vars, and env vars referenced directly in the
+    model. Unit test YAML must live under model-paths; tests/ is reserved for data tests. Only dict
+    and csv allow partial columns; sql requires every column.
+  docs_ref: website/docs/reference/resource-properties/unit-test-overrides.md
+
+- id: tst-013
+  topic: "05"
+  subskill: 05-01
+  type: matching
+  stem: Match each file path to what dbt treats it as, in a project using default paths.
+  pairs:
+    - left: tests/generic/test_is_even.sql
+      right: Custom generic test definition
+    - left: tests/assert_no_negative_totals.sql
+      right: Singular data test
+    - left: tests/fixtures/orders_input.csv
+      right: Unit test fixture file
+    - left: models/marts/_unit_tests.yml
+      right: Unit test definitions
+  explanation: >-
+    Under test-paths, the generic subfolder holds test blocks, the fixtures subfolder holds unit test
+    fixture files, and a top-level .sql file is a singular test. Unit test YAML is discovered from
+    model-paths, so it lives under models/, not tests/.
+  docs_ref: website/docs/reference/resource-properties/data-formats.md
+
+- id: tst-014
+  topic: "05"
+  subskill: 05-01
+  type: multiple-choice
+  stem: >-
+    A unit test on an incremental model overrides is_incremental to true and mocks both
+    ref('events') and this. What do the rows under expect represent?
+  options:
+    a: "The full contents of the table after the merge completes"
+    b: "The rows the materialization will insert or merge into the table"
+    c: "The rows already present in this before the run"
+    d: "The rows of ref('events') that were filtered out by the incremental predicate"
+  answer: [b]
+  explanation: >-
+    For an incremental model, expect is the result of the materialization -- what gets inserted or
+    merged -- not the final table after the merge. dbt currently has no way to unit test that the
+    merge itself was applied correctly.
+  docs_ref: website/docs/docs/build/unit-tests.md
+
+- id: tst-015
+  topic: "05"
+  subskill: 05-01
+  type: multiple-choice
+  code: |
+    {% test warn_if_negative(model, column_name) %}
+        {{ config(severity = 'warn') }}
+        select * from {{ model }}
+        where {{ column_name }} < 0
+    {% endtest %}
+  code_lang: sql
+  stem: >-
+    This test is applied to two columns. On column refund_amount it has no extra configuration. On
+    column total_amount it sets config: {severity: error}. Both columns contain negative values.
+    What happens?
+  options:
+    a: "Both tests warn, because the config() in the test block always wins"
+    b: "Both tests error, because error is the dbt default severity"
+    c: "refund_amount warns and total_amount errors"
+    d: "dbt raises a parse error, because severity cannot be set in two places"
+  answer: [c]
+  explanation: >-
+    A config() inside a generic test block sets the default for every instance of that test. An
+    instance's own YAML configuration overrides the default. So the unconfigured instance inherits
+    warn, and the instance configured with severity: error fails the run.
+  docs_ref: website/docs/best-practices/custom-generic-tests.md
+
+- id: tst-016
+  topic: "05"
+  subskill: 05-01
+  type: multiple-choice
+  stem: >-
+    A unit test expects four output rows. Three of them come out with a different value than
+    expected. How does dbt report this unit test?
+  options:
+    a: "FAIL 3, one failure per mismatched row"
+    b: "FAIL 1, since a unit test is a single test case that either passes or fails"
+    c: "WARN 3, since unit tests default to warn severity"
+    d: "ERROR, since mismatched rows are treated as a compilation error"
+  answer: [b]
+  explanation: >-
+    Each unit test is one test case, so its result is always pass (0) or fail (1), regardless of how
+    many rows differ. Data tests are different: they report the number of failing records returned
+    by the test query.
+  docs_ref: website/docs/docs/build/unit-tests.md
