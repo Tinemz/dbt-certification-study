@@ -41,6 +41,19 @@ the flag that changes behaviour, the classic wrong answer.
 Source: vendor/dbt-docs/website/docs/...
 ```
 
+**Complex features** — anything with several config keys, several files, or several variants
+(unit tests, snapshots, incremental, model versions, contracts, freshness, state). Replace the flat
+rule list with this shape (reference: the Unit test section of `notes/implementing-tests.md`):
+
+1. **What it is.** A short paragraph: what it does, what it runs against, when it runs, what it
+   returns. Define every term the tables below rely on.
+2. **Annotated example.** The real snippet from the docs, with inline comments naming each key.
+3. **Element table** with columns `Element | What it is | Where it goes | Rule` — one row per key,
+   file, or directory. "Where it goes" = file/directory and the YAML level it nests under.
+4. **Variant sub-table** for any option with several values (e.g. `format`, `strategy`) — one row
+   per value, columns for what differs between them.
+5. Then the existing **Exam angles** / **Gotchas** blocks.
+
 Rules for the note:
 - English, slim, no narrative, no progress-tracking prose.
 - Every claim traceable to a doc path.
